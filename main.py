@@ -1,26 +1,30 @@
 import random
+import data
 from recipe import Recipe
 from recipe import Material
-from recipe import MaterialType
 from recipe import QuantityType
 from recipe import Tool
 from recipe import ToolType
 
 
 def main():
-    material_names = ["elephant", "tomato", "window", "poison", "water"]
+    data.DEBUG = True
+
+    word_associations = data.load_usf_free_association_files()
+
+    # material_names = ["elephant", "tomato", "window", "poison", "water"]
 
     quantity_type_countable = QuantityType("{amount} {material}", "{amount} {material_plural}", True)
     quantity_type_gram = QuantityType("{amount} gram of {material}", "{amount} grams of {material}", False)
     quantity_types = [quantity_type_countable, quantity_type_gram]
 
-    tool_type_vessel = ToolType(["cauldron", "container", "vessel"])
+    tool_type_vessel = ToolType(["cauldron"]) #ToolType(["cauldron", "container", "vessel"])
     tool_type_vessel.add_material_consuming_action("Put {material} into {tool}")
     tool_type_vessel.add_simple_action("[Stir|Heat] {tool}")
     tool_type_vessel.add_simple_action("Let {tool} cool down")
-    tool_type_vessel.add_generating_action("Pour out the mixture from {tool}", "{tool} mixture ({contents})", [quantity_type_gram], True)
+    tool_type_vessel.add_generating_action("Pour out the mixture from {tool} to get the {result}", "{tool} mixture \"{contents}\"", [quantity_type_gram], True)
 
-    tool_type_smashing = ToolType(["hammer", "stone"])
+    tool_type_smashing = ToolType(["stone"]) #stone
     tool_type_smashing.add_material_transforming_action("Smash {material} with the {tool}", "smashed {material}")
     tool_type_smashing.add_material_transforming_action("Crack {material} with the {tool}", "cracked {material}")
 
@@ -28,13 +32,17 @@ def main():
 
     tool_type_default = ToolType()
     tool_type_default.add_material_consuming_action("Eat {material}")
-    tool_type_default.add_simple_action("Wait[| for [a[| very| rather] [short|long] time|[1|2|3|4|5|6|7|8|9|10] [seconds|minutes|hours|days]]]")
+    tool_type_default.add_simple_action("Wait[| for [a[| very| rather] [short|long] time|[[a second|a minute|an hour|a day]|[2|3|4|5|6|7|8|9|10] [seconds|minutes|hours|days]]]]")
 
-    create_recipe(material_names, quantity_types, tool_types, tool_type_default)
+    end_product = random.choice(list(word_associations.keys()))
+    #end_product = "hammer"
+    material_names = [t[0] for t in word_associations[end_product]]
+
+    create_recipe(end_product, material_names, quantity_types, tool_types, tool_type_default)
 
 
-def create_recipe(material_names, quantity_types, tool_types, tool_type_default):
-    recipe = Recipe()
+def create_recipe(end_product, material_names, quantity_types, tool_types, tool_type_default):
+    recipe = Recipe(end_product)
 
     for material_name in random.sample(material_names, min(4, len(material_names))):
         quantity_type = random.choice(quantity_types)
@@ -53,6 +61,9 @@ def create_recipe(material_names, quantity_types, tool_types, tool_type_default)
     recipe.add_tool(Tool(tool_type_default))
 
     recipe.create()
+
+    print("=======================")
+    print()
     recipe.print()
 
 

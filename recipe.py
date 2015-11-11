@@ -2,7 +2,8 @@ import random
 
 
 class Recipe(object):
-    def __init__(self):
+    def __init__(self, end_product):
+        self.end_product = end_product
         self.materials = []
         self.tools = []
         self.instructions = []
@@ -26,7 +27,7 @@ class Recipe(object):
     def create(self):
         available_materials = list(map(lambda material: material.copy(), self.materials))
 
-        instruction_count_target = random.randint(5, 20)
+        instruction_count_target = random.randint(5, 10)
         tries_left = 100
         while (len(self.instructions) < instruction_count_target) and (tries_left > 0):
             tool = random.choice(self.tools)
@@ -43,8 +44,14 @@ class Recipe(object):
                           concat_list(available_materials, lambda material: material.get_label_full()) + \
                           " into a pile on the floor"
             self.add_instruction(instruction)
+            self.add_instruction("Wait until they magically transform into a " + self.end_product)
+        else:
+            self.add_instruction("Wait a bit until a " + self.end_product + " suddenly appears")
 
     def print(self):
+        print("How to make a " + self.end_product + " in " + str(len(self.instructions)) + " easy steps:")
+        print()
+
         print("Materials:")
         for material in self.materials:
             print(" - " + material.get_label_full())
@@ -76,6 +83,9 @@ class Material(object):
     def get_label_full(self):
         return self.quantity_type.get_material_label(self, self.amount)
 
+    def get_label_short(self):
+        return self.name
+
     def equals(self, other_material):
         return self.name == other_material.name
 
@@ -85,11 +95,6 @@ class Material(object):
 
     def copy(self):
         return Material(self.name, self.amount, self.quantity_type)
-
-
-class MaterialType(object):
-    def __init__(self):
-        pass
 
 
 class QuantityType(object):
@@ -207,9 +212,10 @@ class Tool(object):
     def call_generating_action(self, available_materials, instruction, result, possible_quantity_types, only_when_filled):
         material_name = self.default_replace(result)
         quantity_type = random.choice(possible_quantity_types)
-        available_materials.append(Material(material_name, quantity_type.random_amount(), quantity_type))
+        result_material = Material(material_name, quantity_type.random_amount(), quantity_type)
+        available_materials.append(result_material)
 
-        result = self.default_replace(instruction)
+        result = self.default_replace(instruction).replace("{result}", result_material.get_label_full())
 
         if only_when_filled:
             self.filling_materials.clear()
@@ -218,7 +224,7 @@ class Tool(object):
 
     def default_replace(self, string):
         return string.replace("{tool}", self.name) \
-                     .replace("{contents}", concat_list(self.filling_materials, lambda material: material.get_label_full()))
+                     .replace("{contents}", concat_list(self.filling_materials, lambda material: material.get_label_short()))
 
     def is_filled(self):
         return len(self.filling_materials) > 0
@@ -325,6 +331,9 @@ def split_ignore_choosing_sections(string):
 
 
 def pluralize(word):
+    if word.endswith("s"):
+        return word
+
     return word + "s"
 
 
