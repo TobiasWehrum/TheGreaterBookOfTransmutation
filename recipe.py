@@ -1,4 +1,11 @@
 import random
+import nltk
+import inflect
+from nltk.corpus import brown
+
+DEBUG = True
+
+p = inflect.engine()
 
 
 class Recipe(object):
@@ -384,10 +391,10 @@ def split_ignore_choosing_sections(string):
 
 
 def pluralize(word):
-    if word.endswith("s"):
-        return word
-
-    return word + "s"
+    return p.plural(word)
+    # if word.endswith("s"):
+    #    return word
+    #return word + "s"
 
 
 def choose_and_remove(elements):
@@ -409,3 +416,26 @@ def concat_list(elements, transform_function=lambda x: x):
 
         result += transform_function(elements[index])
     return result
+
+WORD_TYPE_UNKNOWN = ""
+WORD_TYPE_NOUN = "NN"
+WORD_TYPE_ADJECTIVE = "JJ"
+WORD_TYPE_VERB = "VB"
+WORD_TYPES = [WORD_TYPE_NOUN, WORD_TYPE_ADJECTIVE, WORD_TYPE_VERB]
+
+
+def find_most_common_word_type(word):
+    result = nltk.FreqDist(t for w, t in brown.tagged_words() if w.lower() == word).most_common()
+    if len(result) > 0:
+        result_type = result[0][0]
+        for word_type in WORD_TYPES:
+            if result_type.startswith(word_type):
+                return word_type
+
+        if DEBUG:
+            print("[find_most_common_word_type] Unknown word type: " + result_type)
+    else:
+        if DEBUG:
+            print("[find_most_common_word_type] Unknown word: " + word)
+
+    return WORD_TYPE_UNKNOWN

@@ -1,5 +1,6 @@
 import random
 import data
+import recipe
 from recipe import Recipe
 from recipe import Material
 from recipe import QuantityType
@@ -54,7 +55,7 @@ def create_recipe(end_product, material_names, quantity_types, tool_types, tool_
 
         recipe.add_material(Material(material_name, amount, quantity_type))
 
-    for tool_type in random.sample(tool_types, min(1, len(tool_types))):
+    for tool_type in random.sample(tool_types, min(2, len(tool_types))):
         tool = Tool(tool_type)
         # if not any(tool.equals(other_tool) for other_tool in recipe.tools):
         recipe.add_tool(tool)
