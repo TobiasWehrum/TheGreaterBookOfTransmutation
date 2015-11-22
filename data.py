@@ -3,7 +3,7 @@ import sys
 import locale
 
 
-DEBUG = False
+DEBUG_REDUCE_WORD_LIST = False
 BASE_DIR = os.path.dirname(sys.argv[0])
 DATA_DIR = os.path.join(BASE_DIR, "data")
 USF_FREE_ASSOCIATION_DIR = os.path.join(DATA_DIR, "usf_FreeAssociation_B")
@@ -46,7 +46,7 @@ def load_usf_free_association_files():
             #     print(elements[1])
 
         file.close()
-        if DEBUG:
+        if DEBUG_REDUCE_WORD_LIST:
             break
 
     print("Read " + str(len(result)) + " targets from USF FreeAssociation data files.")

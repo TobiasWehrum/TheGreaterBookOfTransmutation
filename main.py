@@ -13,10 +13,14 @@ from recipe import ActionTransforming
 import nltk
 from nltk.corpus import brown
 
+RELEASE = False
+
+data.DEBUG_REDUCE_WORD_LIST = True and not RELEASE
+DEBUG_SKIP_WORLD_ANALYSIS = True and not RELEASE
+DEBUG_OUTPUT = True
+
 
 def main():
-    data.DEBUG = True
-
     word_associations = data.load_usf_free_association_files()
 
     # material_names = ["elephant", "tomato", "window", "poison", "water"]
@@ -30,7 +34,8 @@ def main():
 
     quantity_type_noun = [quantity_type_countable, quantity_type_ounces, quantity_type_spoonful]
     quantity_type_adjective_and_verb = [quantity_type_idea, quantity_type_concept, quantity_type_notion]
-    quantity_types = {WORD_TYPE_NOUN: quantity_type_noun,
+    quantity_types = {WORD_TYPE_UNKNOWN: quantity_type_noun,
+                      WORD_TYPE_NOUN: quantity_type_noun,
                       WORD_TYPE_ADJECTIVE: quantity_type_adjective_and_verb,
                       WORD_TYPE_VERB_PRESENT: quantity_type_adjective_and_verb}
 
@@ -62,6 +67,11 @@ def create_recipe(end_product, material_names, quantity_types, tool_types, tool_
 
     for material_name in random.sample(material_names, min(4, len(material_names))):
         material_word_type = find_most_common_word_type(material_name)
+
+        # Unknown and length 12? Probably truncated, let's skip it.
+        if material_word_type == WORD_TYPE_UNKNOWN and len(material_name) == 12:
+            continue
+
         if material_word_type in quantity_types:
             quantity_type = random.choice(quantity_types[material_word_type])
             amount = quantity_type.random_amount()
@@ -82,10 +92,9 @@ def create_recipe(end_product, material_names, quantity_types, tool_types, tool_
     recipe.print()
 
 
-DEBUG = True
-
 WORD_TYPE_UNKNOWN = ""
 WORD_TYPE_NOUN = "NN"
+WORD_TYPE_PROPER_NOUN = "NP"
 WORD_TYPE_ADJECTIVE = "JJ"
 # WORD_TYPE_VERB = "VB"
 WORD_TYPE_VERB_PRESENT = "VBG"
@@ -93,6 +102,9 @@ WORD_TYPES = [WORD_TYPE_NOUN, WORD_TYPE_ADJECTIVE, WORD_TYPE_VERB_PRESENT]
 
 
 def find_most_common_word_type(word):
+    if DEBUG_SKIP_WORLD_ANALYSIS:
+        return random.choice(WORD_TYPES)
+
     result = nltk.FreqDist(t for w, t in brown.tagged_words() if w.lower() == word).most_common()
     if len(result) > 0:
         result_type = result[0][0]
@@ -100,10 +112,10 @@ def find_most_common_word_type(word):
             if result_type.startswith(word_type):
                 return word_type
 
-        if DEBUG:
+        if DEBUG_OUTPUT:
             print("[find_most_common_word_type] Unknown word type: " + result_type + " (for " + word + ")")
     else:
-        if DEBUG:
+        if DEBUG_OUTPUT:
             print("[find_most_common_word_type] Unknown word: " + word)
 
     return WORD_TYPE_UNKNOWN

@@ -96,12 +96,15 @@ class Material(object):
         self.rename(name)
         self.amount = amount
         self.quantity_type = quantity_type
+        self.adjectives = []
 
     def get_label_full(self):
         return self.quantity_type.get_material_label(self, self.amount)
 
-    def get_label_short(self):
-        return self.name
+    def get_label_short(self, plural=False):
+        result = ""
+        result += self.name if not plural else self.name_plural
+        return result
 
     def equals(self, other_material):
         return self.name == other_material.name
@@ -123,8 +126,8 @@ class QuantityType(object):
     def get_material_label(self, material, amount):
         return (self.singular_format if amount == 1 else self.pluralized_format)\
             .replace("{amount}", str(amount))\
-            .replace("{material}", material.name)\
-            .replace("{material_plural}", material.name_plural)
+            .replace("{material}", material.get_label_short(False))\
+            .replace("{material_plural}", material.get_label_short(True))
 
     def random_amount(self):
         value_min = 1
