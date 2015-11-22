@@ -7,6 +7,7 @@ class Recipe(object):
         self.materials = []
         self.tools = []
         self.instructions = []
+        self.available_materials = []
 
     def add_material(self, material):
         self.materials.append(material)
@@ -24,29 +25,42 @@ class Recipe(object):
         self.instructions.append(instruction)
         return True
 
-    def create(self):
-        available_materials = list(map(lambda material: material.copy(), self.materials))
+    def has_materials_available(self):
+        return len(self.available_materials) > 0
+
+    def take_random_material(self):
+        index = random.randint(0, len(self.available_materials) - 1)
+        material = self.available_materials[index]
+        del self.available_materials[index]
+        return material
+
+    def finish(self):
+        self.available_materials = list(map(lambda material: material.copy(), self.materials))
 
         instruction_count_target = random.randint(5, 10)
         tries_left = 100
         while (len(self.instructions) < instruction_count_target) and (tries_left > 0):
             tool = random.choice(self.tools)
-            instruction = tool.execute_random_action(available_materials)
-            if not self.add_instruction(instruction):
+            if tool.execute_random_action(self):
+                for t in self.tools:
+                    t.advance_cooldowns()
+            else:
                 tries_left -= 1
 
         for tool in self.tools:
             if tool.is_filled():
-                self.add_instruction(tool.execute_random_generating_filled_action(available_materials))
+                tool.execute_random_generating_filled_action(self)
 
-        if len(available_materials) > 0:
+        if self.has_materials_available():
             instruction = "Drop " + \
-                          concat_list(available_materials, lambda material: material.get_label_full()) + \
+                          concat_list(self.available_materials, lambda material: material.get_label_full()) + \
                           " into a pile on the floor"
             self.add_instruction(instruction)
             self.add_instruction("Wait until they magically transform into a " + self.end_product)
         else:
             self.add_instruction("Wait a bit until a " + self.end_product + " suddenly appears")
+
+        self.tools = [tool for tool in self.tools if tool.used]
 
     def print(self):
         print("How to make a " + self.end_product + " in " + str(len(self.instructions)) + " easy steps:")
@@ -132,6 +146,9 @@ class Tool(object):
             self.name = ""
 
         self.filling_materials = []
+        self.actions = list(map(lambda action: action.copy(), tool_type.actions))
+        self.generating_actions_only_when_filled = [action for action in self.actions if action is ActionGenerating and action.only_when_filled]
+        self.used = False
 
     def has_label(self):
         return len(self.name) > 0
@@ -142,85 +159,29 @@ class Tool(object):
     def equals(self, other_tool):
         return self.name == other_tool.name
 
-    def execute_random_action(self, available_materials):
-        result = ""
-        materials_available = len(available_materials) > 0
-
+    def execute_random_action(self, recipe):
         tries_left = 20
 
-        while (len(result) == 0) and (tries_left > 0):
-            random_value = random.random() * ToolType.CHANCE_TOTAL
-
-            if random_value <= ToolType.CHANCE_SIMPLE_ACTION:
-                if len(self.tool_type.simple_actions) > 0:
-                    result = self.call_simple_action(*random.choice(self.tool_type.simple_actions))
-                    continue
-
-            random_value -= ToolType.CHANCE_SIMPLE_ACTION
-
-            if random_value <= ToolType.CHANCE_CONSUMING_ACTION:
-                if (len(self.tool_type.simple_actions) > 0) and materials_available:
-                    result = self.call_material_consuming_action(available_materials, *random.choice(self.tool_type.consuming_actions))
-                    continue
-
-            random_value -= ToolType.CHANCE_CONSUMING_ACTION
-
-            if random_value <= ToolType.CHANCE_TRANSFORMING_ACTION:
-                if (len(self.tool_type.transforming_actions)) > 0 and materials_available:
-                    result = self.call_material_transforming_action(available_materials, *random.choice(self.tool_type.transforming_actions))
-                    continue
-
-            random_value -= ToolType.CHANCE_TRANSFORMING_ACTION
-
-            if random_value <= ToolType.CHANCE_GENERATING_ACTION:
-                actions = self.tool_type.generating_actions_all if self.is_filled() else self.tool_type.generating_actions_possible_when_unfilled
-                if len(actions) > 0:
-                    result = self.call_generating_action(available_materials, *random.choice(actions))
-                    continue
-
-            # random_value -= ToolType.CHANCE_GENERATING_ACTION
+        while tries_left > 0:
+            action = random.choice(self.actions)
+            if action.execute(self, recipe):
+                self.used = True
+                return True
 
             tries_left -= 1
 
-        return result
+        return False
 
     def execute_random_generating_filled_action(self, available_materials):
-        if not self.is_filled() or len(self.tool_type.generating_actions_only_when_filled) == 0:
-            return ""
+        if not self.is_filled() or len(self.generating_actions_only_when_filled) == 0:
+            return False
 
-        return self.call_generating_action(available_materials, *random.choice(self.tool_type.generating_actions_only_when_filled))
+        action = random.choice(self.generating_actions_only_when_filled)
+        return action.execute()
 
-    def call_simple_action(self, instruction):
-        return self.default_replace(instruction)
-
-    def call_material_consuming_action(self, available_materials, instruction):
-        material = take_random_material(available_materials)
-        self.filling_materials.append(material)
-        return self.default_replace(instruction)\
-            .replace("{material}", material.get_label_full())
-
-    def call_material_transforming_action(self, available_materials, instruction, result):
-        material = take_random_material(available_materials)
-        original_material_label = material.get_label_full()
-
-        material.rename(result.replace("{material}", material.name))
-        available_materials.append(material)
-
-        return self.default_replace(instruction)\
-            .replace("{material}", original_material_label)
-
-    def call_generating_action(self, available_materials, instruction, result, possible_quantity_types, only_when_filled):
-        material_name = self.default_replace(result)
-        quantity_type = random.choice(possible_quantity_types)
-        result_material = Material(material_name, quantity_type.random_amount(), quantity_type)
-        available_materials.append(result_material)
-
-        result = self.default_replace(instruction).replace("{result}", result_material.get_label_full())
-
-        if only_when_filled:
-            self.filling_materials.clear()
-
-        return result
+    def advance_cooldowns(self):
+        for action in self.actions:
+            action.cooldown_left -= 1
 
     def default_replace(self, string):
         return string.replace("{tool}", self.name) \
@@ -231,46 +192,138 @@ class Tool(object):
 
 
 class ToolType(object):
-    CHANCE_SIMPLE_ACTION = 1
-    CHANCE_CONSUMING_ACTION = 1
-    CHANCE_TRANSFORMING_ACTION = 1
-    CHANCE_GENERATING_ACTION = 1
-    CHANCE_TOTAL = CHANCE_SIMPLE_ACTION + CHANCE_CONSUMING_ACTION + CHANCE_TRANSFORMING_ACTION + CHANCE_GENERATING_ACTION
-
     def __init__(self, name_list=False):
         self.name_list = name_list
-        self.simple_actions = []
-        self.consuming_actions = []
-        self.transforming_actions = []
-        self.generating_actions_possible_when_unfilled = []
-        self.generating_actions_only_when_filled = []
-        self.generating_actions_all = []
+        self.actions = []
 
-    def add_simple_action(self, instruction):
-        self.simple_actions.append((instruction,))
-
-    def add_material_consuming_action(self, instruction):
-        self.consuming_actions.append((instruction,))
-
-    def add_material_transforming_action(self, instruction, result):
-        self.transforming_actions.append((instruction, result))
-
-    def add_generating_action(self, instruction, result, possible_quantity_types, only_when_filled):
-        data = (instruction, result, possible_quantity_types, only_when_filled)
-
-        if only_when_filled:
-            self.generating_actions_only_when_filled.append(data)
-        else:
-            self.generating_actions_possible_when_unfilled.append(data)
-
-        self.generating_actions_all.append(data)
+    def add(self, action):
+        self.actions.append(action)
 
 
-def take_random_material(available_materials):
-    index = random.randint(0, len(available_materials) - 1)
-    material = available_materials[index]
-    del available_materials[index]
-    return material
+class Action(object):
+    def __init__(self):
+        self.cooldown_value = 0
+        self.cooldown_left = 0
+
+    @staticmethod
+    def copy_into(source, copied_action):
+        copied_action.cooldown_value = source.cooldown_value
+
+    def cooldown(self, value):
+        self.cooldown_value = value
+        return self
+
+    def execute(self, tool, recipe):
+        if self.cooldown_left > 0:
+            return False
+
+        successful = self.execute_internal(tool, recipe)
+        if successful:
+            self.cooldown_left = self.cooldown_value + 1
+
+        return successful
+
+
+class ActionSimple(Action):
+    def __init__(self, instruction):
+        Action.__init__(self)
+        self.instruction = instruction
+
+    def copy(self):
+        copied_action = ActionSimple(self.instruction)
+        Action.copy_into(self, copied_action)
+        return copied_action
+
+    def execute_internal(self, tool, recipe):
+        result = tool.default_replace(self.instruction)
+        recipe.add_instruction(result)
+        return True
+
+
+class ActionConsuming(Action):
+    def __init__(self, instruction):
+        Action.__init__(self)
+        self.instruction = instruction
+
+    def copy(self):
+        copied_action = ActionConsuming(self.instruction)
+        Action.copy_into(self, copied_action)
+        return copied_action
+
+    def execute_internal(self, tool, recipe):
+        if not recipe.has_materials_available():
+            return False
+
+        material = recipe.take_random_material()
+        tool.filling_materials.append(material)
+
+        result = tool.default_replace(self.instruction)\
+            .replace("{material}", material.get_label_full())
+
+        recipe.add_instruction(result)
+
+        return True
+
+
+class ActionTransforming(Action):
+    def __init__(self, instruction, result):
+        Action.__init__(self)
+        self.instruction = instruction
+        self.result = result
+
+    def copy(self):
+        copied_action = ActionTransforming(self.instruction, self.result)
+        Action.copy_into(self, copied_action)
+        return copied_action
+
+    def execute_internal(self, tool, recipe):
+        if not recipe.has_materials_available():
+            return False
+
+        material = recipe.take_random_material()
+        original_material_label = material.get_label_full()
+
+        material.rename(self.result.replace("{material}", material.name))
+        recipe.available_materials.append(material)
+
+        result = tool.default_replace(self.instruction)\
+            .replace("{material}", original_material_label)
+
+        recipe.add_instruction(result)
+
+        return True
+
+
+class ActionGenerating(Action):
+    def __init__(self, instruction, result, possible_quantity_types, only_when_filled):
+        Action.__init__(self)
+        self.instruction = instruction
+        self.result = result
+        self.possible_quantity_types = possible_quantity_types
+        self.only_when_filled = only_when_filled
+
+    def copy(self):
+        copied_action = ActionGenerating(self.instruction, self.result, self.possible_quantity_types, self.only_when_filled)
+        Action.copy_into(self, copied_action)
+        return copied_action
+
+    def execute_internal(self, tool, recipe):
+        if self.only_when_filled and not tool.is_filled():
+            return False
+
+        material_name = tool.default_replace(self.result)
+        quantity_type = random.choice(self.possible_quantity_types)
+        result_material = Material(material_name, quantity_type.random_amount(), quantity_type)
+        recipe.available_materials.append(result_material)
+
+        result = tool.default_replace(self.instruction).replace("{result}", result_material.get_label_full())
+
+        if self.only_when_filled:
+            tool.filling_materials.clear()
+
+        recipe.add_instruction(result)
+
+        return True
 
 
 def replace_choosing_sections(string):
