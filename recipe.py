@@ -37,6 +37,9 @@ class Recipe(object):
         del self.available_materials[index]
         return material
 
+    def choose_random_material(self):
+        return random.choice(self.available_materials)
+
     def finish(self):
         self.available_materials = list(map(lambda material: material.copy(), self.materials))
 
@@ -90,19 +93,24 @@ class Recipe(object):
 
 
 class Material(object):
-    def __init__(self, name, amount, quantity_type):
+    def __init__(self, name, amount, quantity_type, adjectives = 0):
         self.name = ""
         self.name_plural = ""
         self.rename(name)
         self.amount = amount
         self.quantity_type = quantity_type
-        self.adjectives = []
+
+        if adjectives == 0:
+            adjectives = []
+        self.adjectives = adjectives
 
     def get_label_full(self):
         return self.quantity_type.get_material_label(self, self.amount)
 
     def get_label_short(self, plural=False):
-        result = ""
+        result =  ""
+        if len(self.adjectives) > 0:
+            result += concat_list(self.adjectives) + " "
         result += self.name if not plural else self.name_plural
         return result
 
@@ -114,7 +122,7 @@ class Material(object):
         self.name_plural = pluralize(name)
 
     def copy(self):
-        return Material(self.name, self.amount, self.quantity_type)
+        return Material(self.name, self.amount, self.quantity_type, self.adjectives)
 
 
 class QuantityType(object):
@@ -300,6 +308,53 @@ class ActionTransforming(Action):
         return True
 
 
+class ActionAdjectivize(Action):
+    def __init__(self, instruction, adjectives):
+        Action.__init__(self)
+        self.instruction = instruction
+        self.adjectives = adjectives
+
+    def copy(self):
+        copied_action = ActionAdjectivize(self.instruction, self.adjectives)
+        Action.copy_into(self, copied_action)
+        return copied_action
+
+    def execute_internal(self, tool, recipe):
+        if not recipe.has_materials_available():
+            return False
+
+        material = recipe.choose_random_material()
+        original_material_label = material.get_label_full()
+
+        adjective_count = len(self.adjectives)
+        current_adjective_index = -1
+        existing_index = -1
+        for index in range(adjective_count):
+            adjective = self.adjectives[index]
+            if adjective in material.adjectives:
+                existing_index = index
+                current_adjective_index = index
+                break
+
+        if current_adjective_index == adjective_count - 1:
+            return False
+
+        new_adjective = self.adjectives[current_adjective_index + 1]
+
+        if existing_index >= 0:
+            material.adjectives[existing_index] = new_adjective
+        else:
+            material.adjectives.append(new_adjective)
+
+        result = tool.default_replace(self.instruction) \
+            .replace("{material}", original_material_label) \
+            .replace("{result}", material.get_label_full())
+
+        recipe.add_instruction(result)
+
+        return True
+
+
 class ActionGenerating(Action):
     def __init__(self, instruction, result, possible_quantity_types, only_when_filled):
         Action.__init__(self)
@@ -415,4 +470,3 @@ def concat_list(elements, transform_function=lambda x: x):
 
         result += transform_function(elements[index])
     return result
-

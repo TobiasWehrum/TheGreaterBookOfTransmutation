@@ -10,6 +10,7 @@ from recipe import ActionSimple
 from recipe import ActionConsuming
 from recipe import ActionGenerating
 from recipe import ActionTransforming
+from recipe import ActionAdjectivize
 import nltk
 from nltk.corpus import brown
 
@@ -46,13 +47,13 @@ def main():
     tool_type_vessel.add(ActionGenerating("Pour out the mixture from {tool} to get the {result}", "{tool} mixture \"{contents}\"", [quantity_type_ounces, quantity_type_spoonful], True).cooldown(2))
 
     tool_type_smashing = ToolType(["stone"]) #stone
-    tool_type_smashing.add(ActionTransforming("Smash {material} with the {tool}", "smashed {material}").cooldown(2))
-    tool_type_smashing.add(ActionTransforming("Crack {material} with the {tool}", "cracked {material}").cooldown(2))
+    tool_type_smashing.add(ActionAdjectivize("Smash {material} with the {tool}", ["smashed", "pulverized"]).cooldown(2))
+    tool_type_smashing.add(ActionAdjectivize("Crack {material} with the {tool}", ["cracked", "crushed"]).cooldown(2))
 
     tool_types = [tool_type_vessel, tool_type_smashing]
 
     tool_type_default = ToolType()
-    tool_type_default.add(ActionConsuming("Eat {material}").cooldown(2))
+    # tool_type_default.add(ActionConsuming("Eat {material}").cooldown(2))
     tool_type_default.add(ActionSimple("Wait[| for [a[| very| rather] [short|long] time|[[a second|a minute|an hour|a day]|[2|3|4|5|6|7|8|9|10] [seconds|minutes|hours|days]]]]").cooldown(2))
 
     end_product = random.choice(list(word_associations.keys()))
