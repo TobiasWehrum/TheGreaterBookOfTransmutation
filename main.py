@@ -11,23 +11,22 @@ from recipe import ActionConsuming
 from recipe import ActionGenerating
 from recipe import ActionTransforming
 from recipe import ActionAdjectivize
-import nltk
-from nltk.corpus import brown
+from recipe import EndingToolDefault
 from generator import Markov
+import tools
 
-RELEASE = False
+RELEASE = True
 
 DEBUG_REDUCE_LATIN_WORD_LIST = True and not RELEASE
 data.DEBUG_REDUCE_WORD_LIST = True and not RELEASE
-DEBUG_SKIP_WORLD_ANALYSIS = True and not RELEASE
-DEBUG_OUTPUT = True
+tools.DEBUG_SKIP_WORLD_ANALYSIS = True and not RELEASE
+tools.DEBUG_OUTPUT = True
 UPDATE_NLTK_CORPI = False
 
 
 def main():
     if UPDATE_NLTK_CORPI:
-        nltk.download("brown")
-        nltk.download("cmudict")
+        tools.download_corpi()
 
     words = data.load_latin_words()
     latin_markov = Markov(3)
@@ -37,6 +36,9 @@ def main():
     else:
         for word in random.sample(words, 100):
             latin_markov.add(word.lower())
+
+    # for i in range(10): print(recipe.create_spell(latin_markov))
+    # return
 
     word_associations = data.load_usf_free_association_files()
 
@@ -53,10 +55,10 @@ def main():
     quantity_type_noun = [quantity_type_countable, quantity_type_ounces, quantity_type_spoonful, quantity_type_idea, quantity_type_concept, quantity_type_notion]
     quantity_type_verb = [quantity_type_idea, quantity_type_concept, quantity_type_notion]
     quantity_type_adjective = [quantity_type_idea_being, quantity_type_concept_being, quantity_type_notion_being]
-    quantity_types = {WORD_TYPE_UNKNOWN: quantity_type_noun,
-                      WORD_TYPE_NOUN: quantity_type_noun,
-                      WORD_TYPE_ADJECTIVE: quantity_type_adjective,
-                      WORD_TYPE_VERB_PRESENT: quantity_type_verb}
+    quantity_types = {tools.WORD_TYPE_UNKNOWN: quantity_type_noun,
+                      tools.WORD_TYPE_NOUN: quantity_type_noun,
+                      tools.WORD_TYPE_ADJECTIVE: quantity_type_adjective,
+                      tools.WORD_TYPE_VERB_PRESENT: quantity_type_verb}
 
     tool_type_vessel = ToolType(["cauldron", "container", "vessel"])
     tool_type_vessel.add(ActionConsuming("Put {material} into {tool}"))
@@ -74,70 +76,67 @@ def main():
     # tool_type_default.add(ActionConsuming("Eat {material}").cooldown(2))
     tool_type_default.add(ActionSimple("Wait[| for [a[| very| rather] [short|long] time|[[a second|a minute|an hour|a day]|[2|3|4|5|6|7|8|9|10] [seconds|minutes|hours|days]]]]").cooldown(2))
 
-    end_product = random.choice(list(word_associations.keys()))
-    # end_product = "hammer"
-    material_names = [t[0] for t in word_associations[end_product]]
+    ending_tools = []
+    ending_tools.append(EndingToolDefault(False, [], ["Wait a bit until {aproduct} suddenly appears"]))
+    ending_tools.append(EndingToolDefault(False, [], ["Wait until it rings on the door",
+                                                      "Open the door. You will find {aproduct} just lying there",
+                                                      "Don't ask how it got there. Take it. It's yours now"]))
+    ending_tools.append(EndingToolDefault(False, [], ["Buy {aproduct} on [Amazon|eBay]"]))
+    ending_tools.append(EndingToolDefault(False, [], ["Turn around. You will find that {aproduct} was there all along"]))
+    ending_tools.append(EndingToolDefault(False, [], ["Realise that you never really needed {aproduct}"]))
+    ending_tools.append(EndingToolDefault(True, [], ["Fold the {materials} together using advanced origami techniques",
+                                                     "If you've done it correctly, it [should|might|could] result in {aproduct}"]))
+    ending_tools.append(EndingToolDefault(True, [], ["Dump the {materials} into a pile on the floor",
+                                                     "Wait until they magically transform into {aproduct}"]))
+    ending_tools.append(EndingToolDefault(True, [], ["Use [glue|tape|nails|screws] to join the {materials} together into the [form|shape] of a [perfectly functional|passable|usable|beautiful] {product}"]))
+    ending_tools.append(EndingToolDefault(True, ["[ballpoint pen|charcoal pencil|graphite pencil|silverpoint pen|crayon|paintbrush|electric paint|fountain pen]"],
+                                                ["Draw a magic circle on the floor using the {tool1}",
+                                                 "{drawintoit}",
+                                                 "[Chant|Intone|Whisper] the following spell: \"{spell}\"",
+                                                 "[Suddendly|Slowly|Reluctantly], {aproduct} will appear inside the circle"])
+                            .add_replacement_tuple_by_condition("{drawintoit}", "Draw a line into the circle and place {materials} on each end", lambda r: r.available_materials_count() == 2)
+                            .add_replacement_tuple_by_condition("{drawintoit}", "Draw a triangle into the circle and place {materials} on each corner", lambda r: r.available_materials_count() == 3)
+                            .add_replacement_tuple_by_condition("{drawintoit}", "Draw a [cross|square] into the circle and place {materials} on each corner", lambda r: r.available_materials_count() == 4)
+                            .add_replacement_tuple_by_condition("{drawintoit}", "Draw a [pentagram|pentagon] into the circle and place {materials} on each corner", lambda r: r.available_materials_count() == 5)
+                            .add_replacement_tuple_by_condition("{drawintoit}", "Draw a [hexagram|hexagon] into the circle and place {materials} on each corner", lambda r: r.available_materials_count() == 6)
+                            .add_replacement_tuple_by_condition("{drawintoit}", "Place {materials} into the circle", lambda r: True)
+                            .add_replacement_tuple_delegate(lambda r, concrete_tools, replacement_tuples: replacement_tuples.append(("{spell}", recipe.create_spell(latin_markov)))))
 
-    create_recipe(end_product, material_names, quantity_types, tool_types, tool_type_default)
+    for i in range(10):
+        end_product = random.choice(list(word_associations.keys()))
+        material_names = [t[0] for t in word_associations[end_product]]
+        create_recipe(end_product, material_names, quantity_types, tool_types, tool_type_default, ending_tools)
 
 
-def create_recipe(end_product, material_names, quantity_types, tool_types, tool_type_default):
-    recipe = Recipe(end_product)
+def create_recipe(end_product, material_names, quantity_types, tool_types, tool_type_default, ending_tools):
+    r = Recipe(end_product, ending_tools)
 
     for material_name in random.sample(material_names, min(4, len(material_names))):
-        material_word_type = find_most_common_word_type(material_name)
+        material_word_type = tools.find_most_common_word_type(material_name)
 
         # Unknown and length 12? Probably truncated, let's skip it.
-        if material_word_type == WORD_TYPE_UNKNOWN and len(material_name) == 12:
+        if material_word_type == tools.WORD_TYPE_UNKNOWN and len(material_name) == 12:
             continue
 
         if material_word_type in quantity_types:
             quantity_type = random.choice(quantity_types[material_word_type])
             amount = quantity_type.random_amount()
 
-            recipe.add_material(Material(material_name, amount, quantity_type))
+            r.add_material(Material(material_name, amount, quantity_type))
 
     for tool_type in random.sample(tool_types, min(2, len(tool_types))):
         tool = Tool(tool_type)
-        # if not any(tool.equals(other_tool) for other_tool in recipe.tools):
-        recipe.add_tool(tool)
+        # if not any(tool.equals(other_tool) for other_tool in r.tools):
+        r.add_tool(tool)
 
-    recipe.add_tool(Tool(tool_type_default))
+    r.add_tool(Tool(tool_type_default))
 
-    recipe.finish()
+    r.finish()
 
     print("=======================")
     print()
-    recipe.print()
+    r.print()
 
-
-WORD_TYPE_UNKNOWN = ""
-WORD_TYPE_NOUN = "NN"
-WORD_TYPE_PROPER_NOUN = "NP"
-WORD_TYPE_ADJECTIVE = "JJ"
-# WORD_TYPE_VERB = "VB"
-WORD_TYPE_VERB_PRESENT = "VBG"
-WORD_TYPES = [WORD_TYPE_NOUN, WORD_TYPE_ADJECTIVE, WORD_TYPE_VERB_PRESENT]
-
-
-def find_most_common_word_type(word):
-    if DEBUG_SKIP_WORLD_ANALYSIS:
-        return random.choice(WORD_TYPES)
-
-    result = nltk.FreqDist(t for w, t in brown.tagged_words() if w.lower() == word).most_common()
-    if len(result) > 0:
-        result_type = result[0][0]
-        for word_type in WORD_TYPES:
-            if result_type.startswith(word_type):
-                return word_type
-
-        if DEBUG_OUTPUT:
-            print("[find_most_common_word_type] Unknown word type: " + result_type + " (for " + word + ")")
-    else:
-        if DEBUG_OUTPUT:
-            print("[find_most_common_word_type] Unknown word: " + word)
-
-    return WORD_TYPE_UNKNOWN
 
 # Only run if we are the main program, not an import.
 if __name__ == "__main__": main()

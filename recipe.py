@@ -1,18 +1,18 @@
 import random
-import inflect
 import tools
-
-p = inflect.engine()
 
 
 class Recipe(object):
-    def __init__(self, end_product):
+    def __init__(self, end_product, ending_tools):
+        super(Recipe, self).__init__()
         self.end_product = end_product
         self.end_product_with_indefinite_article = tools.get_indefinite_article(end_product) + " " + end_product
+        self.ending_tools = ending_tools
         self.materials = []
         self.tools = []
         self.instructions = []
         self.available_materials = []
+        self.ending_tool_tools = []
 
     def add_material(self, material):
         self.materials.append(material)
@@ -25,13 +25,17 @@ class Recipe(object):
             return False
 
         instruction = replace_choosing_sections(instruction)
-        instruction += "."
+        if instruction[-1] != "\"":
+            instruction += "."
 
         self.instructions.append(instruction)
         return True
 
     def has_materials_available(self):
         return len(self.available_materials) > 0
+
+    def available_materials_count(self):
+        return len(self.available_materials)
 
     def take_random_material(self):
         index = random.randint(0, len(self.available_materials) - 1)
@@ -66,16 +70,26 @@ class Recipe(object):
             if tool.is_filled():
                 tool.execute_random_generating_filled_action(self)
 
+        """
         if self.has_materials_available():
             instruction = "Drop " + \
-                          concat_list(self.available_materials, lambda material: material.get_label_full()) + \
+                          tools.concat_list(self.available_materials, lambda material: material.get_label_full()) + \
                           " into a pile on the floor"
             self.add_instruction(instruction)
             self.add_instruction("Wait until they magically transform into " + self.end_product_with_indefinite_article)
         else:
             self.add_instruction("Wait a bit until " + self.end_product_with_indefinite_article + " suddenly appears")
+        """
 
         self.tools = [tool for tool in self.tools if tool.used]
+
+        has_materials_available = self.has_materials_available()
+        while True:
+            ending_tool = random.choice(self.ending_tools)
+            if ending_tool.uses_materials == has_materials_available:
+                self.ending_tool_tools = ending_tool.get_concrete_tools()
+                ending_tool.execute(self, self.ending_tool_tools)
+                break
 
     def print(self):
         print("How to make " + self.end_product_with_indefinite_article + " in " + str(len(self.instructions)) + " easy steps:")
@@ -90,6 +104,8 @@ class Recipe(object):
         for tool in self.tools:
             if tool.has_label():
                 print(" - " + tool.get_label())
+        for tool in self.ending_tool_tools:
+            print(" - " + tool)
         print()
 
         print("Instructions:")
@@ -103,6 +119,7 @@ class Recipe(object):
 
 class Material(object):
     def __init__(self, name, amount, quantity_type, adjectives = 0):
+        super(Material, self).__init__()
         self.name = ""
         self.name_plural = ""
         self.rename(name)
@@ -119,7 +136,7 @@ class Material(object):
     def get_label_short(self, plural=False):
         result =  ""
         if len(self.adjectives) > 0:
-            result += concat_list(self.adjectives) + " "
+            result += tools.concat_list(self.adjectives) + " "
         result += self.name if not plural else self.name_plural
         return result
 
@@ -128,7 +145,7 @@ class Material(object):
 
     def rename(self, name):
         self.name = name
-        self.name_plural = pluralize(name)
+        self.name_plural = tools.pluralize(name)
 
     def copy(self):
         return Material(self.name, self.amount, self.quantity_type, list(self.adjectives))
@@ -136,6 +153,7 @@ class Material(object):
 
 class QuantityType(object):
     def __init__(self, singular_format, pluralized_format, integer_only):
+        super(QuantityType, self).__init__()
         self.singular_format = singular_format
         self.pluralized_format = pluralized_format
         self.integer_only = integer_only
@@ -162,6 +180,7 @@ class QuantityType(object):
 
 class Tool(object):
     def __init__(self, tool_type):
+        super(Tool, self).__init__()
         self.tool_type = tool_type
         if tool_type.name_list:
             self.name = random.choice(tool_type.name_list)
@@ -170,7 +189,7 @@ class Tool(object):
 
         self.filling_materials = []
         self.actions = list(map(lambda action: action.copy(), tool_type.actions))
-        self.generating_actions_only_when_filled = [action for action in self.actions if action is ActionGenerating and action.only_when_filled]
+        self.generating_actions_only_when_filled = [action for action in self.actions if isinstance(action, ActionGenerating) and action.only_when_filled]
         self.used = False
 
     def has_label(self):
@@ -198,12 +217,12 @@ class Tool(object):
 
         return False
 
-    def execute_random_generating_filled_action(self, available_materials):
+    def execute_random_generating_filled_action(self, recipe):
         if not self.is_filled() or len(self.generating_actions_only_when_filled) == 0:
             return False
 
         action = random.choice(self.generating_actions_only_when_filled)
-        return action.execute()
+        return action.execute(self, recipe)
 
     def advance_cooldowns(self):
         for action in self.actions:
@@ -211,7 +230,7 @@ class Tool(object):
 
     def default_replace(self, string):
         return string.replace("{tool}", self.name) \
-                     .replace("{contents}", concat_list(self.filling_materials, lambda material: material.get_label_short()))
+                     .replace("{contents}", tools.concat_list(self.filling_materials, lambda material: material.get_label_short()))
 
     def is_filled(self):
         return len(self.filling_materials) > 0
@@ -228,6 +247,7 @@ class ToolType(object):
 
 class Action(object):
     def __init__(self):
+        super(Action, self).__init__()
         self.cooldown_value = 0
         self.cooldown_left = 0
 
@@ -255,7 +275,7 @@ class Action(object):
 
 class ActionSimple(Action):
     def __init__(self, instruction):
-        Action.__init__(self)
+        super(ActionSimple, self).__init__()
         self.instruction = instruction
 
     def copy(self):
@@ -271,7 +291,7 @@ class ActionSimple(Action):
 
 class ActionConsuming(Action):
     def __init__(self, instruction):
-        Action.__init__(self)
+        super(ActionConsuming, self).__init__()
         self.instruction = instruction
 
     def copy(self):
@@ -296,7 +316,7 @@ class ActionConsuming(Action):
 
 class ActionTransforming(Action):
     def __init__(self, instruction, result):
-        Action.__init__(self)
+        super(ActionTransforming, self).__init__()
         self.instruction = instruction
         self.result = result
 
@@ -325,7 +345,7 @@ class ActionTransforming(Action):
 
 class ActionAdjectivize(Action):
     def __init__(self, instruction, adjectives):
-        Action.__init__(self)
+        super(ActionAdjectivize, self).__init__()
         self.instruction = instruction
         self.adjectives = adjectives
 
@@ -372,7 +392,7 @@ class ActionAdjectivize(Action):
 
 class ActionGenerating(Action):
     def __init__(self, instruction, result, possible_quantity_types, only_when_filled):
-        Action.__init__(self)
+        super(ActionGenerating, self).__init__()
         self.instruction = instruction
         self.result = result
         self.possible_quantity_types = possible_quantity_types
@@ -400,6 +420,69 @@ class ActionGenerating(Action):
         recipe.add_instruction(result)
 
         return True
+
+
+class EndingTool(object):
+    def __init__(self, uses_materials, tools):
+        super(EndingTool, self).__init__()
+        self.uses_materials = uses_materials
+        self.tools = tools
+
+    def get_concrete_tools(self):
+        return list(map(lambda tool: replace_choosing_sections(tool), self.tools))
+
+    def execute(self, recipe, concrete_tools):
+        pass
+
+    @staticmethod
+    def default_replace(line, recipe, concrete_tools, replacement_tuples):
+        line = replace_choosing_sections(line)
+
+        line = line.replace("{materials}", tools.concat_list(recipe.available_materials, lambda material: material.get_label_full())) \
+                   .replace("{product}", recipe.end_product) \
+                   .replace("{aproduct}", recipe.end_product_with_indefinite_article)
+
+        index = 1
+        for tool in concrete_tools:
+            line = line.replace("{tool" + str(index) + "}", tool)
+            index += 1
+
+        for replacement_tuple in replacement_tuples:
+            line = line.replace(replacement_tuple[0], replacement_tuple[1])
+
+        return line
+
+
+class EndingToolDefault(EndingTool):
+    def __init__(self, uses_materials, tools, lines):
+        EndingTool.__init__(self, uses_materials, tools)
+        self.lines = lines
+        self.replacement_tuples_by_condition = []
+        self.replacement_tuples_delegates = []
+
+    def add_replacement_tuple_by_condition(self, replace_string, replace_with, condition):
+        self.replacement_tuples_by_condition.append((replace_string, replace_with, condition))
+        return self
+
+    def add_replacement_tuple_delegate(self, delegate):
+        self.replacement_tuples_delegates.append(delegate)
+        return self
+
+    def execute(self, recipe, concrete_tools):
+        replacement_tuples = []
+        for replacement_tuple_by_condition in self.replacement_tuples_by_condition:
+            condition = replacement_tuple_by_condition[2]
+            if condition(recipe):
+                replacement_tuples.append((replacement_tuple_by_condition[0], replacement_tuple_by_condition[1]))
+
+        for replacement_tuple_delegate in self.replacement_tuples_delegates:
+            replacement_tuple_delegate(recipe, concrete_tools, replacement_tuples)
+
+        for line in self.lines:
+            line = self.default_replace(line, recipe, concrete_tools, replacement_tuples)  # First wave
+            line = self.default_replace(line, recipe, concrete_tools, replacement_tuples)  # Second wave
+            recipe.add_instruction(line)
+
 
 
 def replace_choosing_sections(string):
@@ -459,29 +542,36 @@ def split_ignore_choosing_sections(string):
     return result
 
 
-def pluralize(word):
-    return p.plural(word)
-    # if word.endswith("s"):
-    #    return word
-    # return word + "s"
-
-
-def choose_and_remove(elements):
-    index = random.randint(0, len(elements) - 1)
-    item = elements[index]
-    del elements[index]
-    return item
-
-
-def concat_list(elements, transform_function=lambda x: x):
+def create_spell(markov):
     result = ""
-    count = len(elements)
-    for index in range(count):
-        if index > 0:
-            if index == count - 1:
-                result += " and "
-            else:
-                result += ", "
+    for i in range(random.randint(1, random.randint(1, 5))):
+        if len(result) > 0:
+            result += " "
 
-        result += transform_function(elements[index])
+        word_count = random.randint(1, random.randint(1, 8))
+        comma_position = -1
+        if word_count >= 4 and random.random() > 0.5:
+            comma_position = random.randint(2, word_count - 2)
+        result += create_sentence(markov, word_count, comma_position, ["!"])
+
     return result
+
+
+def create_sentence(markov, word_count, comma_position, sentence_end):
+    result = ""
+    for i in range(word_count):
+        if len(result) > 0:
+            result += " "
+
+        result += create_word(markov)
+        if i == comma_position:
+            result += ","
+
+    result = result[0].upper() + result[1:]
+
+    result += random.choice(sentence_end)
+    return result
+
+
+def create_word(markov):
+    return "".join(markov.generate())

@@ -4,6 +4,7 @@ import random
 # Based on https://gist.github.com/agiliq/131679
 class Markov:
     def __init__(self, length):
+        super(Markov, self).__init__()
         self.length = length
         self.database = {}
         self.tuple_array_cache = list(range(self.length))
