@@ -52,17 +52,10 @@ class Recipe(object):
         instruction_count_target = random.randint(5, 10)
         tries_left = 100
         while (len(self.instructions) < instruction_count_target) and (tries_left > 0):
-            total_chance = sum(map(lambda tool: tool.current_chance_sum(), self.tools))
-            number = random.randint(0, total_chance)
-            for check_tool in self.tools:
-                number -= check_tool.current_chance_sum()
-                if number <= 0:
-                    tool = check_tool
-                    break
-
-            if tool.execute_random_action(self):
-                for t in self.tools:
-                    t.advance_cooldowns()
+            chosen_tool = tools.random_weighted_choice(self.tools, lambda t: t.current_chance_sum())
+            if chosen_tool.execute_random_action(self):
+                for tool in self.tools:
+                    tool.advance_cooldowns()
             else:
                 tries_left -= 1
 
@@ -191,6 +184,7 @@ class Tool(object):
         self.actions = list(map(lambda action: action.copy(), tool_type.actions))
         self.generating_actions_only_when_filled = [action for action in self.actions if isinstance(action, ActionGenerating) and action.only_when_filled]
         self.used = False
+        self.values = tool_type.values.copy()
 
     def has_label(self):
         return len(self.name) > 0
@@ -208,7 +202,7 @@ class Tool(object):
         tries_left = 20
 
         while tries_left > 0:
-            action = random.choice(self.actions)
+            action = tools.random_weighted_choice(self.actions, lambda a: a.current_chance())
             if action.execute(self, recipe):
                 self.used = True
                 return True
@@ -237,9 +231,10 @@ class Tool(object):
 
 
 class ToolType(object):
-    def __init__(self, name_list=False):
+    def __init__(self, name_list=False, initial_values=False):
         self.name_list = name_list
         self.actions = []
+        self.values = initial_values if initial_values else []
 
     def add(self, action):
         self.actions.append(action)
@@ -250,25 +245,49 @@ class Action(object):
         super(Action, self).__init__()
         self.cooldown_value = 0
         self.cooldown_left = 0
+        self.chance_value = 1
+        self.condition_delegate = 0
+        self.post_execution_sets = []
 
     @staticmethod
     def copy_into(source, copied_action):
         copied_action.cooldown_value = source.cooldown_value
+        copied_action.chance_value = source.chance_value
+        copied_action.condition_delegate = source.condition_delegate
+        copied_action.post_execution_sets = source.post_execution_sets
 
     def cooldown(self, value):
         self.cooldown_value = value
         return self
 
+    def chance(self, value):
+        self.chance_value = value
+        return self
+
+    def condition(self, delegate):
+        self.condition_delegate = delegate
+        return self
+
+    def afterwards(self, key, value):
+        self.post_execution_sets.append((key, value))
+        return self
+
     def current_chance(self):
-        return 1
+        return self.chance_value
 
     def execute(self, tool, recipe):
         if self.cooldown_left > 0:
             return False
 
+        if self.condition_delegate != 0 and not self.condition_delegate(tool, recipe):
+            return False
+
         successful = self.execute_internal(tool, recipe)
         if successful:
             self.cooldown_left = self.cooldown_value + 1
+
+        for post_execution_set in self.post_execution_sets:
+            tool.values[post_execution_set[0]] = post_execution_set[1]
 
         return successful
 

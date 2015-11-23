@@ -77,3 +77,14 @@ def find_most_common_word_type(word):
             print("[find_most_common_word_type] Unknown word: " + word)
 
     return WORD_TYPE_UNKNOWN
+
+
+def random_weighted_choice(iteration, weight_delegate):
+    total_chance = sum(map(weight_delegate, iteration))
+    number = random.randrange(0, total_chance)
+    for element in iteration:
+        number -= weight_delegate(element)
+        if number <= 0:
+            return element
+
+    return element[-1]

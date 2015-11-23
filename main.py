@@ -15,7 +15,7 @@ from recipe import EndingToolDefault
 from generator import Markov
 import tools
 
-RELEASE = True
+RELEASE = False
 
 DEBUG_REDUCE_LATIN_WORD_LIST = True and not RELEASE
 data.DEBUG_REDUCE_WORD_LIST = True and not RELEASE
@@ -60,10 +60,11 @@ def main():
                       tools.WORD_TYPE_ADJECTIVE: quantity_type_adjective,
                       tools.WORD_TYPE_VERB_PRESENT: quantity_type_verb}
 
-    tool_type_vessel = ToolType(["cauldron", "container", "vessel"])
+    tool_type_vessel = ToolType(["cauldron", "container", "vessel"])  # , {"heated": False})
     tool_type_vessel.add(ActionConsuming("Put {material} into {tool}"))
-    tool_type_vessel.add(ActionSimple("[Stir|Heat] {tool}").cooldown(2))
-    tool_type_vessel.add(ActionSimple("Let {tool} cool down").cooldown(2))
+    tool_type_vessel.add(ActionSimple("Stir {tool}").cooldown(2))
+    tool_type_vessel.add(ActionSimple("Heat {tool}").cooldown(2))  # .condition(lambda tool, r: not tool.values["heated"]).afterwards("heated", True))
+    tool_type_vessel.add(ActionSimple("Let {tool} cool down").cooldown(2))  # .condition(lambda tool, r: tool.values["heated"]).afterwards("heated", False))
     tool_type_vessel.add(ActionGenerating("Pour out the mixture from {tool} to get the {result}", "{tool} mixture \"{contents}\"", [quantity_type_ounces, quantity_type_spoonful], True).cooldown(2))
 
     tool_type_smashing = ToolType(["hammer", "stone"])
@@ -76,20 +77,19 @@ def main():
     # tool_type_default.add(ActionConsuming("Eat {material}").cooldown(2))
     tool_type_default.add(ActionSimple("Wait[| for [a[| very| rather] [short|long] time|[[a second|a minute|an hour|a day]|[2|3|4|5|6|7|8|9|10] [seconds|minutes|hours|days]]]]").cooldown(2))
 
-    ending_tools = []
-    ending_tools.append(EndingToolDefault(False, [], ["Wait a bit until {aproduct} suddenly appears"]))
-    ending_tools.append(EndingToolDefault(False, [], ["Wait until it rings on the door",
-                                                      "Open the door. You will find {aproduct} just lying there",
-                                                      "Don't ask how it got there. Take it. It's yours now"]))
-    ending_tools.append(EndingToolDefault(False, [], ["Buy {aproduct} on [Amazon|eBay]"]))
-    ending_tools.append(EndingToolDefault(False, [], ["Turn around. You will find that {aproduct} was there all along"]))
-    ending_tools.append(EndingToolDefault(False, [], ["Realise that you never really needed {aproduct}"]))
-    ending_tools.append(EndingToolDefault(True, [], ["Fold the {materials} together using advanced origami techniques",
-                                                     "If you've done it correctly, it [should|might|could] result in {aproduct}"]))
-    ending_tools.append(EndingToolDefault(True, [], ["Dump the {materials} into a pile on the floor",
-                                                     "Wait until they magically transform into {aproduct}"]))
-    ending_tools.append(EndingToolDefault(True, [], ["Use [glue|tape|nails|screws] to join the {materials} together into the [form|shape] of a [perfectly functional|passable|usable|beautiful] {product}"]))
-    ending_tools.append(EndingToolDefault(True, ["[ballpoint pen|charcoal pencil|graphite pencil|silverpoint pen|crayon|paintbrush|electric paint|fountain pen]"],
+    ending_tools = [EndingToolDefault(False, [], ["Wait a bit until {aproduct} suddenly appears"]),
+                    EndingToolDefault(False, [], ["Wait until it rings on the door",
+                                                  "Open the door. You will find {aproduct} just lying there",
+                                                  "Don't ask how it got there. Take it. It's yours now"]),
+                    EndingToolDefault(False, [], ["Buy {aproduct} on [Amazon|eBay]"]),
+                    EndingToolDefault(False, [], ["Turn around. You will find that {aproduct} was there all along"]),
+                    EndingToolDefault(False, [], ["Realise that you never really needed {aproduct}"]),
+                    EndingToolDefault(True, [], ["Fold the {materials} together using advanced origami techniques",
+                                                 "If you've done it correctly, it [should|might|could] result in {aproduct}"]),
+                    EndingToolDefault(True, [], ["Dump the {materials} into a pile on the floor",
+                                                 "Wait until they magically transform into {aproduct}"]),
+                    EndingToolDefault(True, [], ["Use [glue|tape|nails|screws] to join the {materials} together into the [form|shape] of a [perfectly functional|passable|usable|beautiful] {product}"]),
+                    EndingToolDefault(True, ["[ballpoint pen|charcoal pencil|graphite pencil|silverpoint pen|crayon|paintbrush|electric paint|fountain pen]"],
                                                 ["Draw a magic circle on the floor using the {tool1}",
                                                  "{drawintoit}",
                                                  "[Chant|Intone|Whisper] the following spell: \"{spell}\"",
@@ -100,7 +100,8 @@ def main():
                             .add_replacement_tuple_by_condition("{drawintoit}", "Draw a [pentagram|pentagon] into the circle and place {materials} on each corner", lambda r: r.available_materials_count() == 5)
                             .add_replacement_tuple_by_condition("{drawintoit}", "Draw a [hexagram|hexagon] into the circle and place {materials} on each corner", lambda r: r.available_materials_count() == 6)
                             .add_replacement_tuple_by_condition("{drawintoit}", "Place {materials} into the circle", lambda r: True)
-                            .add_replacement_tuple_delegate(lambda r, concrete_tools, replacement_tuples: replacement_tuples.append(("{spell}", recipe.create_spell(latin_markov)))))
+                            .add_replacement_tuple_delegate(lambda r, concrete_tools, replacement_tuples: replacement_tuples.append(("{spell}", recipe.create_spell(latin_markov))))
+                    ]
 
     for i in range(10):
         end_product = random.choice(list(word_associations.keys()))
