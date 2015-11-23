@@ -1,5 +1,6 @@
 import random
 import inflect
+import tools
 
 p = inflect.engine()
 
@@ -7,6 +8,7 @@ p = inflect.engine()
 class Recipe(object):
     def __init__(self, end_product):
         self.end_product = end_product
+        self.end_product_with_indefinite_article = tools.get_indefinite_article(end_product) + " " + end_product
         self.materials = []
         self.tools = []
         self.instructions = []
@@ -69,14 +71,14 @@ class Recipe(object):
                           concat_list(self.available_materials, lambda material: material.get_label_full()) + \
                           " into a pile on the floor"
             self.add_instruction(instruction)
-            self.add_instruction("Wait until they magically transform into a " + self.end_product)
+            self.add_instruction("Wait until they magically transform into " + self.end_product_with_indefinite_article)
         else:
-            self.add_instruction("Wait a bit until a " + self.end_product + " suddenly appears")
+            self.add_instruction("Wait a bit until " + self.end_product_with_indefinite_article + " suddenly appears")
 
         self.tools = [tool for tool in self.tools if tool.used]
 
     def print(self):
-        print("How to make a " + self.end_product + " in " + str(len(self.instructions)) + " easy steps:")
+        print("How to make " + self.end_product_with_indefinite_article + " in " + str(len(self.instructions)) + " easy steps:")
         print()
 
         print("Materials:")
@@ -129,7 +131,7 @@ class Material(object):
         self.name_plural = pluralize(name)
 
     def copy(self):
-        return Material(self.name, self.amount, self.quantity_type, self.adjectives)
+        return Material(self.name, self.amount, self.quantity_type, list(self.adjectives))
 
 
 class QuantityType(object):

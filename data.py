@@ -1,12 +1,14 @@
 import os
 import sys
 import locale
+import re
 
 
 DEBUG_REDUCE_WORD_LIST = False
 BASE_DIR = os.path.dirname(sys.argv[0])
 DATA_DIR = os.path.join(BASE_DIR, "data")
 USF_FREE_ASSOCIATION_DIR = os.path.join(DATA_DIR, "usf_FreeAssociation_B")
+LATIN_WORDS_FILE = os.path.join(DATA_DIR, "latin_words", "DICTPAGE.RAW")
 
 
 def load_usf_free_association_files():
@@ -51,6 +53,22 @@ def load_usf_free_association_files():
 
     print("Read " + str(len(result)) + " targets from USF FreeAssociation data files.")
 
+    return result
+
+
+def load_latin_words():
+    result = []
+    match_pattern = re.compile("\w+")
+
+    file = open(LATIN_WORDS_FILE, 'r')
+
+    for line in file:
+        word_match = match_pattern.search(line)
+        if word_match:
+            word = word_match.group()
+            result.append(word)
+
+    file.close()
     return result
 
 
