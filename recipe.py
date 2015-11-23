@@ -46,7 +46,14 @@ class Recipe(object):
         instruction_count_target = random.randint(5, 10)
         tries_left = 100
         while (len(self.instructions) < instruction_count_target) and (tries_left > 0):
-            tool = random.choice(self.tools)
+            total_chance = sum(map(lambda tool: tool.current_chance_sum(), self.tools))
+            number = random.randint(0, total_chance)
+            for check_tool in self.tools:
+                number -= check_tool.current_chance_sum()
+                if number <= 0:
+                    tool = check_tool
+                    break
+
             if tool.execute_random_action(self):
                 for t in self.tools:
                     t.advance_cooldowns()
@@ -173,6 +180,9 @@ class Tool(object):
     def equals(self, other_tool):
         return self.name == other_tool.name
 
+    def current_chance_sum(self):
+        return sum(map(lambda action: action.current_chance(), self.actions))
+
     def execute_random_action(self, recipe):
         tries_left = 20
 
@@ -226,6 +236,9 @@ class Action(object):
     def cooldown(self, value):
         self.cooldown_value = value
         return self
+
+    def current_chance(self):
+        return 1
 
     def execute(self, tool, recipe):
         if self.cooldown_left > 0:
