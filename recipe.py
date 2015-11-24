@@ -25,7 +25,7 @@ class Recipe(object):
             return False
 
         instruction = replace_choosing_sections(instruction)
-        if instruction[-1] != "\"":
+        if instruction[-1].isalpha():
             instruction += "."
 
         self.instructions.append(instruction)
@@ -49,7 +49,7 @@ class Recipe(object):
     def finish(self):
         self.available_materials = list(map(lambda material: material.copy(), self.materials))
 
-        instruction_count_target = random.randint(5, 10)
+        instruction_count_target = random.randint(random.randint(2, 5), 10)
         tries_left = 100
         while (len(self.instructions) < instruction_count_target) and (tries_left > 0):
             chosen_tool = tools.random_weighted_choice(self.tools, lambda t: t.current_chance_sum())
@@ -96,9 +96,9 @@ class Recipe(object):
         print("Tools:")
         for tool in self.tools:
             if tool.has_label():
-                print(" - " + tool.get_label())
+                print(" - " + tool.get_label().capitalize())
         for tool in self.ending_tool_tools:
-            print(" - " + tool)
+            print(" - " + tool.capitalize())
         print()
 
         print("Instructions:")
@@ -126,10 +126,16 @@ class Material(object):
     def get_label_full(self):
         return self.quantity_type.get_material_label(self, self.amount)
 
-    def get_label_short(self, plural=False):
-        result =  ""
-        if len(self.adjectives) > 0:
-            result += tools.concat_list(self.adjectives) + " "
+    def has_adjectives(self):
+        return len(self.adjectives) > 0
+
+    def get_adjectives_label(self):
+        return tools.concat_list(self.adjectives)
+
+    def get_label_short(self, plural=False, include_adjectives=True):
+        result = ""
+        if include_adjectives and self.has_adjectives():
+            result += self.get_adjectives_label() + " "
         result += self.name if not plural else self.name_plural
         return result
 
@@ -139,6 +145,9 @@ class Material(object):
     def rename(self, name):
         self.name = name
         self.name_plural = tools.pluralize(name)
+
+    def them_or_it(self):
+        return "it" if self.amount == 1 else "them"
 
     def copy(self):
         return Material(self.name, self.amount, self.quantity_type, list(self.adjectives))
@@ -152,10 +161,15 @@ class QuantityType(object):
         self.integer_only = integer_only
 
     def get_material_label(self, material, amount):
+        adjectives = ""
+        if material.has_adjectives():
+            adjectives += " " + material.get_adjectives_label()
+
         return (self.singular_format if amount == 1 else self.pluralized_format)\
             .replace("{amount}", str(amount))\
-            .replace("{material}", material.get_label_short(False))\
-            .replace("{material_plural}", material.get_label_short(True))
+            .replace(" {adjectives}", adjectives)\
+            .replace("{material}", material.get_label_short(False, False))\
+            .replace("{material_plural}", material.get_label_short(True, False))
 
     def random_amount(self):
         value_min = 1
@@ -176,7 +190,7 @@ class Tool(object):
         super(Tool, self).__init__()
         self.tool_type = tool_type
         if tool_type.name_list:
-            self.name = random.choice(tool_type.name_list)
+            self.name = replace_choosing_sections(random.choice(tool_type.name_list))
         else:
             self.name = ""
 
@@ -235,15 +249,21 @@ class ToolType(object):
         self.name_list = name_list
         self.actions = []
         self.values = initial_values if initial_values else []
+        self.chance_value = 1
 
     def add(self, action):
         self.actions.append(action)
+        return self
+
+    def chance(self, value):
+        self.chance_value = value
+        return self
 
 
 class Action(object):
     def __init__(self):
         super(Action, self).__init__()
-        self.cooldown_value = 0
+        self.cooldown_value = 2
         self.cooldown_left = 0
         self.chance_value = 1
         self.condition_delegate = 0
@@ -293,28 +313,39 @@ class Action(object):
 
 
 class ActionSimple(Action):
-    def __init__(self, instruction):
+    def __init__(self, instruction, uses_material = False):
         super(ActionSimple, self).__init__()
         self.instruction = instruction
+        self.uses_material = uses_material
 
     def copy(self):
-        copied_action = ActionSimple(self.instruction)
+        copied_action = ActionSimple(self.instruction, self.uses_material)
         Action.copy_into(self, copied_action)
         return copied_action
 
     def execute_internal(self, tool, recipe):
         result = tool.default_replace(self.instruction)
+
+        if self.uses_material:
+            if not recipe.has_materials_available():
+                return False
+
+            material = recipe.choose_random_material()
+            result = result.replace("{material}", material.get_label_full()) \
+                           .replace("{material_it}", material.them_or_it())
+
         recipe.add_instruction(result)
         return True
 
 
 class ActionConsuming(Action):
-    def __init__(self, instruction):
+    def __init__(self, instruction, destroying = False):
         super(ActionConsuming, self).__init__()
         self.instruction = instruction
+        self.destroying = destroying
 
     def copy(self):
-        copied_action = ActionConsuming(self.instruction)
+        copied_action = ActionConsuming(self.instruction, self.destroying)
         Action.copy_into(self, copied_action)
         return copied_action
 
@@ -323,10 +354,13 @@ class ActionConsuming(Action):
             return False
 
         material = recipe.take_random_material()
-        tool.filling_materials.append(material)
 
-        result = tool.default_replace(self.instruction)\
-            .replace("{material}", material.get_label_full())
+        if not self.destroying:
+            tool.filling_materials.append(material)
+
+        result = tool.default_replace(self.instruction) \
+            .replace("{material}", material.get_label_full()) \
+            .replace("{material_it}", material.them_or_it())
 
         recipe.add_instruction(result)
 
@@ -350,12 +384,14 @@ class ActionTransforming(Action):
 
         material = recipe.take_random_material()
         original_material_label = material.get_label_full()
+        original_material_then_or_it = material.them_or_it()
 
         material.rename(self.result.replace("{material}", material.name))
         recipe.available_materials.append(material)
 
-        result = tool.default_replace(self.instruction)\
-            .replace("{material}", original_material_label)
+        result = tool.default_replace(self.instruction) \
+            .replace("{material}", original_material_label) \
+            .replace("{material_it}", original_material_then_or_it)
 
         recipe.add_instruction(result)
 
@@ -379,6 +415,7 @@ class ActionAdjectivize(Action):
 
         material = recipe.choose_random_material()
         original_material_label = material.get_label_full()
+        original_material_then_or_it = material.them_or_it()
 
         adjective_count = len(self.adjectives)
         current_adjective_index = -1
@@ -402,6 +439,7 @@ class ActionAdjectivize(Action):
 
         result = tool.default_replace(self.instruction) \
             .replace("{material}", original_material_label) \
+            .replace("{material_it}", original_material_then_or_it) \
             .replace("{result}", material.get_label_full())
 
         recipe.add_instruction(result)
@@ -435,6 +473,38 @@ class ActionGenerating(Action):
 
         if self.only_when_filled:
             tool.filling_materials.clear()
+
+        recipe.add_instruction(result)
+
+        return True
+
+
+class ActionConsumeEverything(Action):
+    def __init__(self, instruction, destroying=False):
+        super(ActionConsumeEverything, self).__init__()
+        self.instruction = instruction
+        self.destroying = destroying
+
+    def copy(self):
+        copied_action = ActionConsumeEverything(self.instruction, self.destroying)
+        Action.copy_into(self, copied_action)
+        return copied_action
+
+    def execute_internal(self, tool, recipe):
+        if not recipe.has_materials_available():
+            return False
+
+        thrown_away_materials = []
+        while recipe.has_materials_available():
+            material = recipe.take_random_material()
+
+            if not self.destroying:
+                tool.filling_materials.append(material)
+
+            thrown_away_materials.append(material)
+
+        result = tool.default_replace(self.instruction) \
+                     .replace("{materials}", tools.concat_list(thrown_away_materials, lambda m: m.get_label_full()))
 
         recipe.add_instruction(result)
 
@@ -501,7 +571,6 @@ class EndingToolDefault(EndingTool):
             line = self.default_replace(line, recipe, concrete_tools, replacement_tuples)  # First wave
             line = self.default_replace(line, recipe, concrete_tools, replacement_tuples)  # Second wave
             recipe.add_instruction(line)
-
 
 
 def replace_choosing_sections(string):
@@ -586,7 +655,7 @@ def create_sentence(markov, word_count, comma_position, sentence_end):
         if i == comma_position:
             result += ","
 
-    result = result[0].upper() + result[1:]
+    result = result.capitalize()
 
     result += random.choice(sentence_end)
     return result

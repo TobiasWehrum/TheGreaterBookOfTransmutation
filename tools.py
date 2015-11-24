@@ -81,7 +81,7 @@ def find_most_common_word_type(word):
 
 def random_weighted_choice(iteration, weight_delegate):
     total_chance = sum(map(weight_delegate, iteration))
-    number = random.randrange(0, total_chance)
+    number = random.uniform(0, total_chance)
     for element in iteration:
         number -= weight_delegate(element)
         if number <= 0:
