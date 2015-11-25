@@ -1,6 +1,9 @@
 import random
 import tools
-
+from pylatex import Document, Section, Subsection, Table, Math, TikZ, Axis, \
+    Plot, Figure, Package, Itemize, Enumerate
+from pylatex.command import Command
+from pylatex.utils import italic, bold
 
 class Recipe(object):
     def __init__(self, end_product, ending_tools):
@@ -108,6 +111,30 @@ class Recipe(object):
             index += 1
 
         print()
+
+    def print_to_doc(self, doc):
+        with doc.create(Section(self.end_product)):
+            doc.append("How to make " + self.end_product_with_indefinite_article + " in " + str(len(self.instructions)) + " easy steps:\n")
+
+            with doc.create(Subsection("Materials")):
+                with doc.create(Itemize()) as itemize:
+                    for material in self.materials:
+                        itemize.add_item(material.get_label_full())
+
+            with doc.create(Subsection("Tools")):
+                with doc.create(Itemize()) as itemize:
+                    for tool in self.tools:
+                        if tool.has_label():
+                            itemize.add_item(tool.get_label().capitalize())
+                    for tool in self.ending_tool_tools:
+                        itemize.add_item(tool.capitalize())
+
+            with doc.create(Subsection("Instructions")):
+                with doc.create(Enumerate()) as enum:
+                    for instruction in self.instructions:
+                        enum.add_item(instruction)
+
+            doc.append(Command("newpage"))
 
 
 class Material(object):
@@ -417,17 +444,17 @@ class ActionAdjectivize(Action):
         original_material_label = material.get_label_full()
         original_material_then_or_it = material.them_or_it()
 
-        adjective_count = len(self.adjectives)
+        my_adjectives_count = len(self.adjectives)
         current_adjective_index = -1
         existing_index = -1
-        for index in range(adjective_count):
-            adjective = self.adjectives[index]
-            if adjective in material.adjectives:
-                existing_index = index
-                current_adjective_index = index
-                break
+        for my_adjective_index in range(my_adjectives_count):
+            for material_adjective_index in range(len(material.adjectives)):
+                if self.adjectives[my_adjective_index] == material.adjectives[material_adjective_index]:
+                    existing_index = material_adjective_index
+                    current_adjective_index = my_adjective_index
+                    break
 
-        if current_adjective_index == adjective_count - 1:
+        if current_adjective_index == my_adjectives_count - 1:
             return False
 
         new_adjective = self.adjectives[current_adjective_index + 1]
@@ -640,18 +667,22 @@ def create_spell(markov):
         comma_position = -1
         if word_count >= 4 and random.random() > 0.5:
             comma_position = random.randint(2, word_count - 2)
-        result += create_sentence(markov, word_count, comma_position, ["!"])
+        result += create_sentence(markov, word_count, comma_position, ["!"], 12)
 
     return result
 
 
-def create_sentence(markov, word_count, comma_position, sentence_end):
+def create_sentence(markov, word_count, comma_position, sentence_end, max_word_length):
     result = ""
     for i in range(word_count):
         if len(result) > 0:
             result += " "
 
-        result += create_word(markov)
+        word = create_word(markov)
+        while len(word) > max_word_length:
+            word = create_word(markov)
+
+        result += word
         if i == comma_position:
             result += ","
 

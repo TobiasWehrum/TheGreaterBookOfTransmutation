@@ -15,8 +15,11 @@ from recipe import ActionConsumeEverything
 from recipe import EndingToolDefault
 from generator import Markov
 import tools
+from pylatex import Document, Section, Subsection, Table, Math, TikZ, Axis, \
+    Plot, Figure, Package
+from pylatex.utils import italic, bold
 
-RELEASE = False
+RELEASE = True
 
 DEBUG_REDUCE_LATIN_WORD_LIST = True and not RELEASE
 data.DEBUG_REDUCE_WORD_LIST = True and not RELEASE
@@ -53,7 +56,7 @@ def main():
     # quantity_type_concept_being = QuantityType("{amount} clear concept of being {material}", "{amount} clear concepts of being {material}", True)
     # quantity_type_notion_being = QuantityType("{amount} vague notion of being {material}", "{amount} vague notions of being {material}", True)
 
-    quantity_type_noun = [quantity_type_countable, quantity_type_ounces, quantity_type_spoonful, quantity_type_idea, quantity_type_concept, quantity_type_notion]
+    quantity_type_noun = [quantity_type_countable, quantity_type_ounces, quantity_type_spoonful]
     quantity_type_verb = [quantity_type_idea, quantity_type_concept, quantity_type_notion]
     quantity_type_adjective = quantity_type_verb
     quantity_types = {tools.WORD_TYPE_UNKNOWN: quantity_type_noun,
@@ -97,7 +100,7 @@ def main():
                   .add(ActionGenerating("Retrieve the {result} from the {tool}", "ashes of \"{contents}\"", [quantity_type_ounces, quantity_type_spoonful], True)),
 
                   ToolType(["freezer"])
-                  .add(ActionAdjectivize("Put {material} into the {tool} for a while", ["cool", "frozen"])),
+                  .add(ActionAdjectivize("Put {material} into the {tool} for a while", ["cooled", "frozen"])),
 
                   ToolType(["[pet|familiar] [cat|dog|unicorn|ape|mouse|chinchilla|hummingbird]"]).chance(joke_chance_tool)
                   .add(ActionConsuming("Feed {material} to your {tool}"))
@@ -141,11 +144,14 @@ def main():
                             .add_replacement_tuple_delegate(lambda r, concrete_tools, replacement_tuples: replacement_tuples.append(("{spell}", recipe.create_spell(latin_markov))))
                     ]
 
+    recipes = []
+
     for i in range(10):
         end_product = random.choice(list(word_associations.keys()))
         material_names = [t[0] for t in word_associations[end_product]]
-        create_recipe(end_product, material_names, quantity_types, tool_types, tool_type_default, ending_tools)
+        recipes.append(create_recipe(end_product, material_names, quantity_types, tool_types, tool_type_default, ending_tools))
 
+    create_pdf(recipes)
 
 def create_recipe(end_product, material_names, quantity_types, tool_types, tool_type_default, ending_tools):
     r = Recipe(end_product, ending_tools)
@@ -186,6 +192,16 @@ def create_recipe(end_product, material_names, quantity_types, tool_types, tool_
     print("=======================")
     print()
     r.print()
+
+    return r
+
+
+def create_pdf(recipes):
+    doc = Document()
+    for r in recipes:
+        r.print_to_doc(doc)
+
+    doc.generate_pdf()
 
 
 # Only run if we are the main program, not an import.
