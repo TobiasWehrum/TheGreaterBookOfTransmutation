@@ -9,6 +9,7 @@ BASE_DIR = os.path.dirname(sys.argv[0])
 DATA_DIR = os.path.join(BASE_DIR, "data")
 USF_FREE_ASSOCIATION_DIR = os.path.join(DATA_DIR, "usf_FreeAssociation_B")
 LATIN_WORDS_FILE = os.path.join(DATA_DIR, "latin_words", "DICTPAGE.RAW")
+UNCOUNTABLE_NOUNS_DIR = os.path.join(DATA_DIR, "uncountable_nouns")
 
 
 def load_usf_free_association_files():
@@ -67,6 +68,16 @@ def load_latin_words():
         if word_match:
             word = word_match.group()
             result.append(word)
+
+    file.close()
+    return result
+
+
+def load_uncountable_nouns():
+    result = []
+    for file in files_in_folder(UNCOUNTABLE_NOUNS_DIR, "txt"):
+        for line in file:
+            result.append(line[:-1])
 
     file.close()
     return result

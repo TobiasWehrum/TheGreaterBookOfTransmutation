@@ -4,12 +4,27 @@ from pylatex import Document, Section, Subsection, Table, Math, TikZ, Axis, \
     Plot, Figure, Package, Itemize, Enumerate
 from pylatex.command import Command
 from pylatex.utils import italic, bold
+import re
+
 
 class Recipe(object):
     def __init__(self, end_product, ending_tools):
         super(Recipe, self).__init__()
+
         self.end_product = end_product
-        self.end_product_with_indefinite_article = tools.get_indefinite_article(end_product) + " " + end_product
+        self.end_product_indefinite_article = tools.get_indefinite_article(self.end_product) + " "
+
+        if tools.is_uncountable_noun(self.end_product):
+            self.end_product_indefinite_article = ""
+        elif not tools.DEBUG_SKIP_WORD_ANALYSIS and not tools.has_word_type(self.end_product, [tools.WORD_TYPE_NOUN]):
+            word_type = tools.find_most_common_word_type(self.end_product)
+            if word_type == tools.WORD_TYPE_VERB:
+                self.end_product = "something that can " + self.end_product
+                self.end_product_indefinite_article = ""
+            elif word_type == tools.WORD_TYPE_ADJECTIVE:
+                self.end_product = "something " + self.end_product
+                self.end_product_indefinite_article = ""
+
         self.ending_tools = ending_tools
         self.materials = []
         self.tools = []
@@ -24,9 +39,6 @@ class Recipe(object):
         self.tools.append(tool)
 
     def add_instruction(self, instruction):
-        if len(instruction) == 0:
-            return False
-
         instruction = replace_choosing_sections(instruction)
         if instruction[-1].isalpha():
             instruction += "."
@@ -88,7 +100,7 @@ class Recipe(object):
                 break
 
     def print(self):
-        print("How to make " + self.end_product_with_indefinite_article + " in " + str(len(self.instructions)) + " easy steps:")
+        print("How to make " + self.end_product_indefinite_article + "e{{" + self.end_product + "}}e in " + str(len(self.instructions)) + " easy steps:")
         print()
 
         print("Materials:")
@@ -97,11 +109,16 @@ class Recipe(object):
         print()
 
         print("Tools:")
+        tools_added = False
         for tool in self.tools:
             if tool.has_label():
                 print(" - " + tool.get_label().capitalize())
+                tools_added = True
         for tool in self.ending_tool_tools:
             print(" - " + tool.capitalize())
+            tools_added = True
+        if not tools_added:
+            print(" - None")
         print()
 
         print("Instructions:")
@@ -112,27 +129,86 @@ class Recipe(object):
 
         print()
 
+    def count_words(self):
+        words = count_words(self.end_product)
+        words += count_words("How to make " + self.end_product_indefinite_article + self.end_product + " in " + str(len(self.instructions)) + " easy steps")
+        words += count_words("Materials")
+        for material in self.materials:
+            words += count_words(material.get_label_full())
+
+        words += count_words("Tools")
+        tools_added = False
+        for tool in self.tools:
+            if tool.has_label():
+                words += count_words(tool.get_label())
+                tools_added = True
+        for tool in self.ending_tool_tools:
+            words += count_words(tool)
+            tools_added = True
+        if not tools_added:
+            words += count_words("None")
+
+        words += count_words("Instructions")
+        for instruction in self.instructions:
+            words += count_words(instruction.replace("m{{", "").replace("t{{", "").replace("e{{", "").replace("}}m", "").replace("}}t", "").replace("}}e", ""))
+
+        return words
+
     def print_to_doc(self, doc):
         with doc.create(Section(self.end_product)):
-            doc.append("How to make " + self.end_product_with_indefinite_article + " in " + str(len(self.instructions)) + " easy steps:\n")
+            doc.append("How to make " + self.end_product_indefinite_article + "\\textbf{" + self.end_product + "} in " + str(len(self.instructions)) + " easy steps:\n")
 
             with doc.create(Subsection("Materials")):
                 with doc.create(Itemize()) as itemize:
                     for material in self.materials:
-                        itemize.add_item(material.get_label_full())
+                        itemize.add_item(material.get_label_full().replace("&", "\\&"))
 
             with doc.create(Subsection("Tools")):
                 with doc.create(Itemize()) as itemize:
+                    tools_added = False
                     for tool in self.tools:
                         if tool.has_label():
                             itemize.add_item(tool.get_label().capitalize())
+                            tools_added = True
                     for tool in self.ending_tool_tools:
                         itemize.add_item(tool.capitalize())
+                        tools_added = True
+
+                    if not tools_added:
+                        itemize.add_item("None")
 
             with doc.create(Subsection("Instructions")):
                 with doc.create(Enumerate()) as enum:
                     for instruction in self.instructions:
+                        instruction = instruction.replace("e{{", "\\textbf{")
+                        instruction = instruction.replace("}}e", "}")
+                        instruction = instruction.replace("m{{", "\\textbf{")
+                        instruction = instruction.replace("}}m", "}")
+                        instruction = instruction.replace("t{{", "")  # \\textit{
+                        instruction = instruction.replace("}}t", "")
+                        instruction = instruction.replace("&", "\\&")
                         enum.add_item(instruction)
+                        """
+                        enum.add_item("")
+                        start = instruction.find("{{")
+                        while start != -1:
+                            end = instruction.find("}}")
+                            if start > 1:
+                                enum.append(instruction[:start-1])
+
+                            type = instruction[start-1:start]
+                            item = instruction[start+2:end]
+                            if type == "m":
+                                enum.append(italic(item))
+                            else:
+                                enum.append(bold(item))
+
+                            instruction = instruction[end+3:]
+                            start = instruction.find("{{")
+
+                        if len(instruction) > 0:
+                            enum.append(instruction)
+                        """
 
             doc.append(Command("newpage"))
 
@@ -264,7 +340,7 @@ class Tool(object):
             action.cooldown_left -= 1
 
     def default_replace(self, string):
-        return string.replace("{tool}", self.name) \
+        return string.replace("{tool}", "t{{" + self.name + "}}t") \
                      .replace("{contents}", tools.concat_list(self.filling_materials, lambda material: material.get_label_short()))
 
     def is_filled(self):
@@ -358,7 +434,7 @@ class ActionSimple(Action):
                 return False
 
             material = recipe.choose_random_material()
-            result = result.replace("{material}", material.get_label_full()) \
+            result = result.replace("{material}", "m{{" + material.get_label_full() + "}}m") \
                            .replace("{material_it}", material.them_or_it())
 
         recipe.add_instruction(result)
@@ -386,7 +462,7 @@ class ActionConsuming(Action):
             tool.filling_materials.append(material)
 
         result = tool.default_replace(self.instruction) \
-            .replace("{material}", material.get_label_full()) \
+            .replace("{material}", "m{{" + material.get_label_full() + "}}m") \
             .replace("{material_it}", material.them_or_it())
 
         recipe.add_instruction(result)
@@ -417,7 +493,7 @@ class ActionTransforming(Action):
         recipe.available_materials.append(material)
 
         result = tool.default_replace(self.instruction) \
-            .replace("{material}", original_material_label) \
+            .replace("{material}", "m{{" + original_material_label + "}}m") \
             .replace("{material_it}", original_material_then_or_it)
 
         recipe.add_instruction(result)
@@ -465,9 +541,9 @@ class ActionAdjectivize(Action):
             material.adjectives.append(new_adjective)
 
         result = tool.default_replace(self.instruction) \
-            .replace("{material}", original_material_label) \
+            .replace("{material}", "m{{" + original_material_label + "}}m") \
             .replace("{material_it}", original_material_then_or_it) \
-            .replace("{result}", material.get_label_full())
+            .replace("{result}", "m{{" + material.get_label_full() + "}}m")
 
         recipe.add_instruction(result)
 
@@ -496,7 +572,7 @@ class ActionGenerating(Action):
         result_material = Material(material_name, quantity_type.random_amount(), quantity_type)
         recipe.available_materials.append(result_material)
 
-        result = tool.default_replace(self.instruction).replace("{result}", result_material.get_label_full())
+        result = tool.default_replace(self.instruction).replace("{result}", "m{{" + result_material.get_label_full() + "}}m")
 
         if self.only_when_filled:
             tool.filling_materials.clear()
@@ -531,7 +607,7 @@ class ActionConsumeEverything(Action):
             thrown_away_materials.append(material)
 
         result = tool.default_replace(self.instruction) \
-                     .replace("{materials}", tools.concat_list(thrown_away_materials, lambda m: m.get_label_full()))
+                     .replace("{materials}", tools.concat_list(thrown_away_materials, lambda m: "m{{" + m.get_label_full() + "}}m"))
 
         recipe.add_instruction(result)
 
@@ -554,9 +630,9 @@ class EndingTool(object):
     def default_replace(line, recipe, concrete_tools, replacement_tuples):
         line = replace_choosing_sections(line)
 
-        line = line.replace("{materials}", tools.concat_list(recipe.available_materials, lambda material: material.get_label_full())) \
-                   .replace("{product}", recipe.end_product) \
-                   .replace("{aproduct}", recipe.end_product_with_indefinite_article)
+        line = line.replace("{materials}", tools.concat_list(recipe.available_materials, lambda material: "m{{" + material.get_label_full() + "}}m")) \
+                   .replace("{product}", "e{{" + recipe.end_product + "}}e") \
+                   .replace("{aproduct}", recipe.end_product_indefinite_article + "e{{" + recipe.end_product + "}}e")
 
         index = 1
         for tool in concrete_tools:
@@ -694,3 +770,9 @@ def create_sentence(markov, word_count, comma_position, sentence_end, max_word_l
 
 def create_word(markov):
     return "".join(markov.generate())
+
+
+def count_words(str):
+    # print(str)
+    # print(len(re.findall(r'\b[\w.]+\b', str)))
+    return len(re.findall(r'\b[\w.]+\b', str))
