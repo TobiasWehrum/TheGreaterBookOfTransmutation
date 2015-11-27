@@ -59,9 +59,7 @@ target/
 # PyCharm
 .idea
 /*.out
-/*.pdf
 /*.gz
-/*.tex
 /*.toc
 /*.aux
 /*.log
