@@ -130,7 +130,7 @@ class Recipe(object):
         print()
 
     def count_words(self):
-        words = count_words(self.end_product)
+        words = count_words(self.end_product_indefinite_article + self.end_product)
         words += count_words("How to make " + self.end_product_indefinite_article + self.end_product + " in " + str(len(self.instructions)) + " easy steps")
         words += count_words("Materials")
         for material in self.materials:
@@ -155,7 +155,7 @@ class Recipe(object):
         return words
 
     def print_to_doc(self, doc):
-        with doc.create(Section(self.end_product)):
+        with doc.create(Section((self.end_product_indefinite_article + self.end_product).capitalize())):
             doc.append("How to make " + self.end_product_indefinite_article + "\\textbf{" + self.end_product + "} in " + str(len(self.instructions)) + " easy steps:\n")
 
             with doc.create(Subsection("Materials")):

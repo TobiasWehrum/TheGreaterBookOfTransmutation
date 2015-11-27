@@ -17,9 +17,13 @@ from generator import Markov
 import tools
 import math
 import time
-from pylatex import Document
+import os
+from pylatex import Document, Section, Subsection, Table, Math, TikZ, Axis, \
+    Plot, Figure, Package, Itemize, Enumerate
+from pylatex.command import Command
+from pylatex.utils import italic, bold
 
-RELEASE = False
+RELEASE = True
 
 DEBUG_REDUCE_LATIN_WORD_LIST = True and not RELEASE
 data.DEBUG_REDUCE_WORD_LIST = True and not RELEASE
@@ -156,8 +160,8 @@ def main():
     word_count = 0
     word_count_target = 50000
     end_products_left = list(word_associations.keys())
-    for i in range(10):
-    # while word_count < word_count_target and len(end_products_left) > 0:
+#    for i in range(10):
+    while word_count < word_count_target and len(end_products_left) > 0:
         end_product = random.choice(end_products_left)
         end_products_left.remove(end_product)
         material_names = [t[0] for t in word_associations[end_product]]
@@ -172,6 +176,8 @@ def main():
 
         print("Word count: " + str(word_count) + "/" + str(word_count_target) + " (" + str(math.floor((percent_done)*100)) + "%)")
         print("Elapsed time: " + str(math.ceil(total_elapsed_time)) + "min, estimated remaining time: " + str(max(0, math.ceil(elapsed_time/percent_done - elapsed_time))) + "min")
+
+    recipes = sorted(recipes, key=lambda a: a.end_product)
 
     create_pdf(recipes)
 
@@ -235,10 +241,40 @@ def create_recipe(end_product, material_names, quantity_types, tool_types, tool_
 
 def create_pdf(recipes):
     doc = Document()
+    doc.packages.append(Package("hyperref", options="hidelinks"))
+
+    doc.append("\\begin{titlepage}\n"
+               "\\centering\n"
+               "{\\scshape\\Huge\\textbf The Greater Book of Transmutation \\par}\n"
+               "\\vspace{1.5cm}\n"
+               "{\\scshape\\large How to make almost anything in a few easy steps \\par}\n"
+               "\\vspace{5.5cm}\n"
+               "{\\large A Procedurally Generated DIY Book \\par}\n"
+               "{\\large for the \href{https://github.com/dariusk/NaNoGenMo-2015}{NaNoGenMo 2015} \\par}\n"
+               "\\vspace{0.5cm}\n"
+               "{\\large by \\href{http://dragonlab.de}{Tobias Wehrum} \\par}\n"
+               "\\vfill\n"
+               "{\\scriptsize using data by: \\par}\n"
+               "\\vspace{0.3cm}\n"
+               "{\\scriptsize\\href{http://web.usf.edu/FreeAssociation}{Nelson, D. L., McEvoy, C. L., \\& Schreiber, T. A. (1998). The University of South Florida word association, rhyme, and word fragment norms}\\par}\n"
+               "\\vspace{0.3cm}\n"
+               "{\\scriptsize\\href{https://www.englishclub.com/vocabulary/nouns-uncountable-list.htm}{English Club: Uncountable Nouns List}\\par}\n"
+               "\\vspace{0.3cm}\n"
+               "{\\scriptsize\\href{http://archives.nd.edu/whitaker/dictpage.htm}{LATIN-ENGLISH DICTIONARY WORDLIST Version 1.97FC by William Whitaker}\\par}\n"
+               "\\vspace{0.5cm}\n"
+               "\\end{titlepage}\n"
+               "\n"
+               "\\setcounter{tocdepth}{1}\n"
+               "\\renewcommand*\\contentsname{How to make...}\n"
+               "\\tableofcontents\n"
+               "\\newpage");
+
     for r in recipes:
         r.print_to_doc(doc)
 
-    doc.generate_pdf()
+    os.remove("TheGreaterBookOfTransmutation.toc")
+    doc.generate_pdf("TheGreaterBookOfTransmutation")
+    doc.generate_tex("TheGreaterBookOfTransmutation")
 
 
 # Only run if we are the main program, not an import.
