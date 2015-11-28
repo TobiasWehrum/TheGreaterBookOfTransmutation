@@ -97,7 +97,7 @@ def main():
 
                   ToolType(["centrifuge"])
                   .add(ActionConsuming("Put {material} into the rotating {tool}").cooldown(0))
-                  .add(ActionConsuming("Speed up the {tool}").condition(lambda t, r: t.is_filled()))
+                  .add(ActionSimple("Speed up the {tool}").condition(lambda t, r: t.is_filled()))
                   .add(ActionGenerating("Stop the {tool} and retrieve the {result}", "centrifuged mixture \"{contents}\"", [quantity_type_ounces, quantity_type_spoonful], True)),
 
                   ToolType(["bonfire", "fireplace"])
