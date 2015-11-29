@@ -36,6 +36,6 @@ The Greater Book of Transmutation is mainly based on a free association database
 That might also help those that are struggling to make a book. And if you are missing one of the materials or tools, maybe another entry in The Greater Book of Transmutation could help you make it!
 
 Used data sources:
-- [Nelson, D. L., McEvoy, C. L., & Schreiber, T. A. (1998). The University of South Florida word association, rhyme, and word fragment norms](http://web.usf.edu/FreeAssociation}
+- [Nelson, D. L., McEvoy, C. L., & Schreiber, T. A. (1998). The University of South Florida word association, rhyme, and word fragment norms](http://web.usf.edu/FreeAssociation)
 - [English Club: Uncountable Nouns List](https://www.englishclub.com/vocabulary/nouns-uncountable-list.htm)
-- [LATIN-ENGLISH DICTIONARY WORDLIST Version 1.97FC by William Whitaker](http://archives.nd.edu/whitaker/dictpage.htm}
+- [LATIN-ENGLISH DICTIONARY WORDLIST Version 1.97FC by William Whitaker](http://archives.nd.edu/whitaker/dictpage.htm)
