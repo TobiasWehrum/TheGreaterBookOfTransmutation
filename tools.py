@@ -8,6 +8,7 @@ from nltk.corpus import wordnet
 
 DEBUG_SKIP_WORD_ANALYSIS = False
 DEBUG_OUTPUT = False
+DEBUG_OUTPUT_NOISY = False
 
 WORD_TYPE_UNKNOWN = ""
 WORD_TYPE_NOUN = "N"
@@ -62,7 +63,7 @@ def concat_list(elements, transform_function=lambda x: x):
         result += transform_function(elements[index])
     return result
 
-import time
+
 def find_most_common_word_type(word):
     if DEBUG_SKIP_WORD_ANALYSIS:
         return random.choice(WORD_TYPES)
@@ -70,6 +71,9 @@ def find_most_common_word_type(word):
     result = nltk.FreqDist(t for w, t in brown.tagged_words() if w.lower() == word).most_common()
     if len(result) > 0:
         result_type = result[0][0]
+        if DEBUG_OUTPUT_NOISY:
+            print(word + " is a " + result_type)
+
         for word_type in WORD_TYPES:
             if result_type.startswith(word_type):
                 return word_type
@@ -93,6 +97,8 @@ def has_word_type(word, word_types):
             result_type = result[0]
             for word_type in word_types:
                 if result_type.startswith(word_type):
+                    if DEBUG_OUTPUT_NOISY:
+                        print(word + " has a word type " + result_type)
                     return True
     else:
         if DEBUG_OUTPUT:

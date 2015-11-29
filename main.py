@@ -18,6 +18,7 @@ import tools
 import math
 import time
 import os
+import traceback
 from pylatex import Document, Section, Subsection, Table, Math, TikZ, Axis, \
     Plot, Figure, Package, Itemize, Enumerate
 from pylatex.command import Command
@@ -29,6 +30,7 @@ DEBUG_REDUCE_LATIN_WORD_LIST = True and not RELEASE
 data.DEBUG_REDUCE_WORD_LIST = True and not RELEASE
 tools.DEBUG_SKIP_WORD_ANALYSIS = True and not RELEASE
 tools.DEBUG_OUTPUT = True
+tools.DEBUG_OUTPUT_NOISY = True
 UPDATE_NLTK_CORPI = False
 
 
@@ -272,9 +274,20 @@ def create_pdf(recipes):
     for r in recipes:
         r.print_to_doc(doc)
 
-    os.remove("TheGreaterBookOfTransmutation.toc")
-    doc.generate_pdf("TheGreaterBookOfTransmutation")
-    doc.generate_tex("TheGreaterBookOfTransmutation")
+    try:
+        os.remove("TheGreaterBookOfTransmutation.toc")
+    except Exception as err:
+        traceback.print_tb(err.__traceback__)
+
+    try:
+        doc.generate_pdf("TheGreaterBookOfTransmutation")
+    except Exception as err:
+        traceback.print_tb(err.__traceback__)
+
+    try:
+        doc.generate_tex("TheGreaterBookOfTransmutation")
+    except Exception as err:
+        traceback.print_tb(err.__traceback__)
 
 
 # Only run if we are the main program, not an import.
