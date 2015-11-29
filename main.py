@@ -71,8 +71,8 @@ def main():
                       tools.WORD_TYPE_VERB: quantity_type_verb,
                       tools.WORD_TYPE_VERB_PRESENT: quantity_type_verb}
 
-    joke_chance_tool = 0.05
-    joke_chance_action = 0.005
+    joke_chance_tool = 0.1
+    joke_chance_action = 0.013
     joke_cooldown = 1000
 
     tool_types = [ToolType(["cauldron", "container", "vessel"]) # , {"heated": False})
@@ -121,9 +121,9 @@ def main():
         .add(ActionSimple("Wait[| for [a[| very| rather] [short|long] time|[[a second|a minute|an hour|a day]|[2|3|4|5|6|7|8|9|10] [seconds|minutes|hours|days]]]]")) \
         .add(ActionConsuming("Eat {material}").chance(joke_chance_action)) \
         .add(ActionConsuming("Throw {material} away").chance(joke_chance_action)) \
-        .add(ActionConsumeEverything("Throw {materials} away").chance(joke_chance_action)) \
-        .add(ActionSimple("Pick up {material}. Turn {material_it} around. Look at {material_it} from every every side. [Nod satisfied|Shake your head [dissatisfied|with disgust]]. Put {material_it} back", True).cooldown(joke_cooldown).chance(joke_chance_action)) \
-        .add(ActionSimple("Grind a little bit of [unicorn horn|troll teeth|bat wings|antler of the extinct flying stag|hair from a president] to dust. It's not strictly needed, but doesn't hurt I guess?").cooldown(joke_cooldown).chance(joke_chance_action))
+        .add(ActionConsumeEverything("Throw {materials} away").chance(joke_chance_action * 2)) \
+        .add(ActionSimple("Pick up {material}. Turn {material_it} around. Look at {material_it} from every every side. [Nod satisfied|Shake your head [dissatisfied|with disgust]]. Put {material_it} back", True).cooldown(joke_cooldown).chance(joke_chance_action * 2)) \
+        .add(ActionSimple("Grind a little bit of [unicorn horn|troll teeth|bat wings|antler of the extinct flying stag|hair from a president] to dust and add it. It's not strictly needed, but doesn't hurt I guess?").cooldown(joke_cooldown).chance(joke_chance_action / 2))
 
     ending_tools = [EndingToolDefault(False, [], ["Wait a bit until {aproduct} suddenly appears"]),
                     EndingToolDefault(False, [], ["Wait until it rings on the door",
