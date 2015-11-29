@@ -2,7 +2,7 @@
 
 After missing last year's NaNoGenMo, I thought I should finally take the plunge [this year](https://github.com/dariusk/NaNoGenMo-2015). Nevermind that I never made any generative text before.
 
-The Greater Book of Transmutation is mainly based on a free association database that I found [here](http://web.usf.edu/FreeAssociation). It's about making things, using materials that are commonly associated with them - e.g., a cat might be made from "being feline", "claws", "meows" and "being graceful" and "tail". Throw in a system of tools with actions that use/transform materials, a bit of word classification, markov-chain latin words generator, a lot of sillyness and whatever else I will add before the month ends, and you get something like:
+The Greater Book of Transmutation is mainly based on a free association database that I found [here](http://web.usf.edu/FreeAssociation). It's about making things, using materials that are commonly associated with them - e.g., a cat might be made from "being feline", "claws", "meows", "being graceful" and "tail". Throw in a system of tools with actions that use/transform materials, a bit of word classification, a markov chain latin words generator, a lot of silliness and bit LaTeX and you get something like:
 
 > How to make a book in 12 easy steps:
 > 
